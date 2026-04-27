@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Node
+node_modules/
+npm-debug.log
+.npm/
+
+# Local Claude state (per-machine, not shared)
+.claude/settings.local.json
+.claude/.cache/
