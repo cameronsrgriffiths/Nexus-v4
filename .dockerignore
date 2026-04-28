@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.gitignore
+.claude
+.nexus
+.vscode
+.idea
+.DS_Store
+README.md
+plan.md
+skills-lock.json
+CLAUDE.md
+tests

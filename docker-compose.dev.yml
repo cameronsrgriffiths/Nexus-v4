@@ -1,0 +1,42 @@
+services:
+  nexus:
+    build:
+      target: dev
+    image: nexus-v4:dev
+    command: bun --hot apps/server/src/index.ts
+    volumes:
+      - ./apps/server/src:/app/apps/server/src
+      - ./apps/server/drizzle:/app/apps/server/drizzle
+      - ./apps/server/drizzle.config.ts:/app/apps/server/drizzle.config.ts
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    image: nexus-v4:dev
+    command: bun run dev
+    working_dir: /app/apps/web
+    volumes:
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/index.html:/app/apps/web/index.html
+      - ./apps/web/vite.config.ts:/app/apps/web/vite.config.ts
+    environment:
+      VITE_SERVER_URL: http://nexus:3000
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    depends_on:
+      - nexus
+
+  postgres:
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+
+  minio:
+    ports:
+      - "${MINIO_PORT_API:-9000}:9000"
+      - "${MINIO_PORT_CONSOLE:-9001}:9001"
+
+  embedding:
+    ports:
+      - "${EMBEDDING_HOST_PORT:-7997}:7997"

@@ -1,0 +1,19 @@
+{
+  "name": "nexus-v4",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up",
+    "dev:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
+    "prod": "docker compose up",
+    "prod:down": "docker compose down",
+    "smoke": "bun test tests/smoke.test.ts",
+    "typecheck": "bun run --filter '*' typecheck",
+    "build": "bun run --filter '*' build"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/bun": "^1.1.17"
+  }
+}

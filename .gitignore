@@ -10,6 +10,18 @@ node_modules/
 npm-debug.log
 .npm/
 
+# Bun
+.bun/
+
+# Build outputs
+dist/
+apps/*/dist/
+
+# Env
+.env
+.env.local
+.env.*.local
+
 # Local Claude state (per-machine, not shared)
 .claude/settings.local.json
 .claude/.cache/
