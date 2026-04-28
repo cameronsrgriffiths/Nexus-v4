@@ -1,0 +1,67 @@
+name: nexus
+
+services:
+  nexus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+    image: nexus-v4:prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      embedding:
+        condition: service_started
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-nexus}:${POSTGRES_PASSWORD:-nexus}@postgres:5432/${POSTGRES_DB:-nexus}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-nexus}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-nexus_dev_password_change_me}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nexus}
+      EMBEDDING_URL: http://embedding:7997
+    ports:
+      - "${NEXUS_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nexus}
+      POSTGRES_USER: ${POSTGRES_USER:-nexus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexus} -d ${POSTGRES_DB:-nexus}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nexus}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nexus_dev_password_change_me}
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  embedding:
+    image: michaelf34/infinity:0.0.75
+    command: v2 --model-id nomic-ai/nomic-embed-text-v1.5 --trust-remote-code --port 7997
+    volumes:
+      - embedding_data:/app/.cache
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+  embedding_data:
