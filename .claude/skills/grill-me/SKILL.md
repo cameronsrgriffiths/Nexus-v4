@@ -7,6 +7,10 @@ description: Interview the user about a plan, feature, or issue using a living-d
 
 You are interrogating the user about a plan, feature, or issue until the PRD draft has no remaining gaps. The artifact you're building IS your working state — every answered question becomes content in `prd-draft.md`. The conversation is ephemeral; the document persists across sessions.
 
+## Communication style
+
+Phrase everything — questions, draft prose, context entries, any chat reply — as simply and concisely as possible while staying precise. Plain words over jargon, short sentences over long ones, direct claims over hedged ones. Clarity beats thoroughness; an extra sentence that doesn't add information is worse than missing.
+
 ## Invocation shapes
 
 ```

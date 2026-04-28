@@ -4,6 +4,10 @@ Platform for building, hosting, and operating AI agents across SMS, voice, email
 
 The full product spec started as `plan.md` (frozen baseline). PRDs (once written) live as GitHub issues; their local snapshots live under `.nexus/`. Implementation is broken into vertical-slice issues consumed by the orchestrator (`/orchestrate`).
 
+## Communication style
+
+Phrase everything — chat replies, PR descriptions, commit messages, issue comments, code comments — as simply and concisely as possible while staying precise. Plain words over jargon, short sentences over long ones, direct claims over hedged ones. Clarity beats thoroughness; an extra sentence that doesn't add information is worse than missing.
+
 ## Source-of-truth precedence
 
 When two sources mention the same thing, trust them in this order (most authoritative first):
