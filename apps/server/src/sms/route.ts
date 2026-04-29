@@ -45,7 +45,7 @@ export function smsRoute({ db, credentials, runtime, twilioFetch }: Deps) {
 
   router.post('/twilio/inbound', async (c) => {
     const raw = await c.req.raw.clone().text();
-    const params = parseFormParams(raw);
+    const params = Object.fromEntries(new URLSearchParams(raw));
     const to = params.To;
     const from = params.From;
     const body = params.Body;
@@ -62,14 +62,12 @@ export function smsRoute({ db, credentials, runtime, twilioFetch }: Deps) {
       .limit(1);
     if (!ch) return c.json({ error: 'channel_not_found' }, 404);
 
-    const authToken = await credentials.get(ch.orgId, 'twilio', 'auth_token');
-    if (!authToken) return c.json({ error: 'twilio_credentials_missing' }, 500);
-    const accountSid = await credentials.get(ch.orgId, 'twilio', 'account_sid');
-    if (!accountSid) return c.json({ error: 'twilio_credentials_missing' }, 500);
+    const creds = await loadTwilioCreds(credentials, ch.orgId);
+    if (!creds) return c.json({ error: 'twilio_credentials_missing' }, 500);
 
     const url = inboundWebhookUrl(c.req.raw.url, c.req.header('x-forwarded-proto'));
     const signature = c.req.header('x-twilio-signature') ?? '';
-    if (!verifyTwilioSignature(url, params, signature, authToken)) {
+    if (!verifyTwilioSignature(url, params, signature, creds.authToken)) {
       return c.json({ error: 'invalid_signature' }, 403);
     }
 
@@ -81,8 +79,8 @@ export function smsRoute({ db, credentials, runtime, twilioFetch }: Deps) {
     });
 
     await sendTwilioSms({
-      accountSid,
-      authToken,
+      accountSid: creds.accountSid,
+      authToken: creds.authToken,
       from: to,
       to: from,
       body: result.reply,
@@ -134,14 +132,11 @@ export function smsRoute({ db, credentials, runtime, twilioFetch }: Deps) {
       content,
     });
 
-    const authToken = await credentials.get(orgId, 'twilio', 'auth_token');
-    const accountSid = await credentials.get(orgId, 'twilio', 'account_sid');
-    if (!authToken || !accountSid) {
-      return c.json({ error: 'twilio_credentials_missing' }, 500);
-    }
+    const creds = await loadTwilioCreds(credentials, orgId);
+    if (!creds) return c.json({ error: 'twilio_credentials_missing' }, 500);
     await sendTwilioSms({
-      accountSid,
-      authToken,
+      accountSid: creds.accountSid,
+      authToken: creds.authToken,
       from: ch.address,
       to: phone.value,
       body: content,
@@ -154,11 +149,16 @@ export function smsRoute({ db, credentials, runtime, twilioFetch }: Deps) {
   return router;
 }
 
-function parseFormParams(raw: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  const params = new URLSearchParams(raw);
-  for (const [k, v] of params) out[k] = v;
-  return out;
+async function loadTwilioCreds(
+  credentials: CredentialService,
+  orgId: string,
+): Promise<{ accountSid: string; authToken: string } | null> {
+  const [accountSid, authToken] = await Promise.all([
+    credentials.get(orgId, 'twilio', 'account_sid'),
+    credentials.get(orgId, 'twilio', 'auth_token'),
+  ]);
+  if (!accountSid || !authToken) return null;
+  return { accountSid, authToken };
 }
 
 function inboundWebhookUrl(reqUrl: string, forwardedProto: string | undefined): string {
