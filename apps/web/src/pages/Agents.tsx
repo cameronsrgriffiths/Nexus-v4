@@ -8,6 +8,7 @@ export type Agent = {
   runtimeMode: 'headless' | 'dedicated';
   voiceEnabled: boolean;
   widgetChannelId: string | null;
+  smsChannel: { id: string; phoneNumber: string } | null;
 };
 
 type FormDraft = {
@@ -25,6 +26,18 @@ const EMPTY_DRAFT: FormDraft = {
 };
 
 type DeleteTarget = { id: string; name: string };
+
+type SmsDraft = {
+  twilioAccountSid: string;
+  twilioAuthToken: string;
+  phoneNumber: string;
+};
+
+const EMPTY_SMS_DRAFT: SmsDraft = {
+  twilioAccountSid: '',
+  twilioAuthToken: '',
+  phoneNumber: '',
+};
 
 export function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -211,6 +224,9 @@ export function Agents() {
         agents={agents}
         onEdit={startEdit}
         onDelete={(a) => setPendingDelete({ id: a.id, name: a.name })}
+        onSmsConnected={() => {
+          void refresh();
+        }}
       />
 
       {pendingDelete && (
@@ -254,12 +270,15 @@ function AgentList({
   agents,
   onEdit,
   onDelete,
+  onSmsConnected,
 }: {
   loading: boolean;
   agents: Agent[];
   onEdit: (a: Agent) => void;
   onDelete: (a: Agent) => void;
+  onSmsConnected: () => void;
 }) {
+  const [openSmsAgentId, setOpenSmsAgentId] = useState<string | null>(null);
   if (loading) {
     return <p className="text-zinc-400 text-sm">Loading…</p>;
   }
@@ -276,41 +295,178 @@ function AgentList({
         <li
           key={a.id}
           data-testid={`agent-row-${a.id}`}
-          className="flex items-center justify-between px-4 py-3"
+          className="px-4 py-3 space-y-2"
         >
-          <div className="min-w-0">
-            <div className="font-medium text-zinc-100">{a.name}</div>
-            <div className="truncate text-xs text-zinc-400">
-              {a.model} · voice {a.voiceEnabled ? 'on' : 'off'}
-            </div>
-            {a.widgetChannelId && (
-              <div
-                data-testid={`agent-widget-channel-${a.id}`}
-                className="mt-1 truncate font-mono text-[10px] text-zinc-500"
-              >
-                widget: {a.widgetChannelId}
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="font-medium text-zinc-100">{a.name}</div>
+              <div className="truncate text-xs text-zinc-400">
+                {a.model} · voice {a.voiceEnabled ? 'on' : 'off'}
               </div>
-            )}
+              {a.widgetChannelId && (
+                <div
+                  data-testid={`agent-widget-channel-${a.id}`}
+                  className="mt-1 truncate font-mono text-[10px] text-zinc-500"
+                >
+                  widget: {a.widgetChannelId}
+                </div>
+              )}
+              {a.smsChannel && (
+                <div
+                  data-testid={`agent-sms-channel-${a.id}`}
+                  className="mt-1 truncate text-xs text-zinc-300"
+                >
+                  SMS: <span className="font-mono">{a.smsChannel.phoneNumber}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {!a.smsChannel && (
+                <button
+                  type="button"
+                  data-testid={`agent-connect-sms-${a.id}`}
+                  onClick={() =>
+                    setOpenSmsAgentId(openSmsAgentId === a.id ? null : a.id)
+                  }
+                  className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                >
+                  {openSmsAgentId === a.id ? 'Cancel' : 'Connect SMS'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onEdit(a)}
+                className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(a)}
+                className="rounded-md border border-red-700/60 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30"
+              >
+                Delete
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => onEdit(a)}
-              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(a)}
-              className="rounded-md border border-red-700/60 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30"
-            >
-              Delete
-            </button>
-          </div>
+
+          {openSmsAgentId === a.id && (
+            <SmsConnectForm
+              agentId={a.id}
+              onConnected={() => {
+                setOpenSmsAgentId(null);
+                onSmsConnected();
+              }}
+              onCancel={() => setOpenSmsAgentId(null)}
+            />
+          )}
         </li>
       ))}
     </ul>
+  );
+}
+
+function SmsConnectForm({
+  agentId,
+  onConnected,
+  onCancel,
+}: {
+  agentId: string;
+  onConnected: () => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState<SmsDraft>(EMPTY_SMS_DRAFT);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/channels/sms', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ agentId, ...draft }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Connect failed (${res.status})`);
+      }
+      setDraft(EMPTY_SMS_DRAFT);
+      onConnected();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Connect failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form
+      data-testid={`sms-connect-form-${agentId}`}
+      onSubmit={onSubmit}
+      className="space-y-3 rounded-md border border-zinc-800 bg-zinc-950/40 p-3 text-sm"
+    >
+      <h3 className="font-semibold text-zinc-200">Connect an SMS number</h3>
+      <p className="text-xs text-zinc-400">
+        Paste the credentials from your Twilio console (Account → API keys & tokens).
+        The Account SID and Auth Token live on the project's main dashboard;
+        the phone number must already be provisioned in Twilio.
+      </p>
+      <TextField
+        label="Twilio Account SID"
+        value={draft.twilioAccountSid}
+        onChange={(twilioAccountSid) => setDraft((d) => ({ ...d, twilioAccountSid }))}
+        required
+      />
+      <TextField
+        label="Twilio Auth Token"
+        value={draft.twilioAuthToken}
+        onChange={(twilioAuthToken) => setDraft((d) => ({ ...d, twilioAuthToken }))}
+        required
+      />
+      <TextField
+        label="Phone number (E.164, e.g. +15551234567)"
+        value={draft.phoneNumber}
+        onChange={(phoneNumber) => setDraft((d) => ({ ...d, phoneNumber }))}
+        required
+      />
+      <div className="rounded-md border border-zinc-800 bg-zinc-900/60 p-2 text-xs text-zinc-400">
+        <p className="font-medium text-zinc-300">After saving:</p>
+        <p className="mt-1">
+          In Twilio, open the phone number's settings and set the <em>"A Message
+          Comes In"</em> webhook to{' '}
+          <code className="rounded bg-zinc-800 px-1 font-mono">
+            {`${typeof window === 'undefined' ? '' : window.location.origin}/sms/twilio/inbound`}
+          </code>{' '}
+          (HTTP POST). Twilio will sign each request with the auth token above; we
+          verify it before dispatching to the agent.
+        </p>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:opacity-60"
+        >
+          {submitting ? 'Saving…' : 'Save SMS channel'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

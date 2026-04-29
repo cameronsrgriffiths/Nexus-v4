@@ -1,13 +1,12 @@
-// Headless runtime: the single inbound entry point.
+// Headless runtime: the single inbound + outbound entry point.
 //
 // Resolves a channel identifier → contact (lookup or create) → session (lookup
-// or create), persists the user turn, invokes the agent, persists the
-// assistant turn, returns the reply.
+// or create), then either invokes the agent (inbound) or appends an
+// operator-supplied assistant message (outbound proactive send).
 //
-// PRD invariant #10: outbound message-send (#10) reuses this exact resolver
-// and append-and-invoke flow. Keep `resolveSession` and `runTurn` as the
-// single shared entry points so the outbound path can call them directly
-// once it lands.
+// PRD invariant #10: outbound and inbound resolve through the same
+// `resolveSession` code path. When a contact replies to an outbound send,
+// inbound finds the same session.
 //
 // PRD invariants honored here:
 //   #1 / #2: each call materializes a fresh per-session SDK working directory
@@ -144,11 +143,25 @@ export function createHeadlessRuntime({ db, sessionRoot, invokeAgent }: Deps) {
       return { sessionId, reply };
     },
 
+    // Outbound proactive send. Resolves the session through the same code
+    // path inbound uses, then appends the assistant message. The caller is
+    // responsible for actually delivering the message over the channel
+    // (e.g. Twilio for SMS); this method only handles the session +
+    // persistence side. PRD invariant #10.
+    async handleOutbound(args: InboundArgs): Promise<InboundResult> {
+      const { sessionId } = await resolveSession(args);
+      await store.append(sessionId, { role: 'assistant', content: args.content });
+      return { sessionId, reply: args.content };
+    },
+
     async listMessages(sessionId: string): Promise<StoredMessage[]> {
       return store.list(sessionId);
     },
 
-    // Exposed so future code (outbound send in #10) can share the resolver.
+    // Exposed so callers that need just the resolver (without running a turn)
+    // can share it.
     resolveSession,
   };
 }
+
+export type HeadlessRuntime = ReturnType<typeof createHeadlessRuntime>;

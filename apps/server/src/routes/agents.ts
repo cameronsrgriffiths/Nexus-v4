@@ -24,19 +24,13 @@ export function agentsRoute({ db }: Deps) {
   router.get('/', async (c) => {
     const orgId = await resolveOrgId(c, db);
     if (!orgId) return c.json({ error: 'unauthenticated' }, 401);
-    const rows = await db
-      .select({
-        agent,
-        widgetChannelId: channel.id,
-      })
-      .from(agent)
-      .leftJoin(
-        channel,
-        and(eq(channel.agentId, agent.id), eq(channel.kind, 'widget')),
-      )
-      .where(eq(agent.orgId, orgId));
+    const rows = await db.select().from(agent).where(eq(agent.orgId, orgId));
+    const channels = await db
+      .select()
+      .from(channel)
+      .where(eq(channel.orgId, orgId));
     return c.json(
-      { agents: rows.map((r) => toApi(r.agent, r.widgetChannelId ?? null)) },
+      { agents: rows.map((row) => toApi(row, channels)) },
       200,
     );
   });
@@ -55,14 +49,12 @@ export function agentsRoute({ db }: Deps) {
       .values({ orgId, name, persona, model, voiceEnabled })
       .returning();
     // Auto-provision a widget channel: every agent ships with a widget by
-    // default. Future slices can let the operator manage channels explicitly;
-    // for now, the agent and its widget are 1:1 so the operator can grab the
-    // channel id and embed the widget immediately.
+    // default. SMS lands later via POST /api/channels/sms.
     const [widgetChannel] = await db
       .insert(channel)
       .values({ orgId, kind: 'widget', agentId: created!.id })
       .returning();
-    return c.json({ agent: toApi(created!, widgetChannel!.id) }, 201);
+    return c.json({ agent: toApi(created!, [widgetChannel!]) }, 201);
   });
 
   router.patch('/:id', async (c) => {
@@ -81,12 +73,11 @@ export function agentsRoute({ db }: Deps) {
       .where(and(eq(agent.id, id), eq(agent.orgId, orgId)))
       .returning();
     if (!updated) return c.json({ error: 'not_found' }, 404);
-    const [widgetChannel] = await db
-      .select({ id: channel.id })
+    const channels = await db
+      .select()
       .from(channel)
-      .where(and(eq(channel.agentId, updated.id), eq(channel.kind, 'widget')))
-      .limit(1);
-    return c.json({ agent: toApi(updated, widgetChannel?.id ?? null) }, 200);
+      .where(eq(channel.agentId, updated.id));
+    return c.json({ agent: toApi(updated, channels) }, 200);
   });
 
   router.delete('/:id', async (c) => {
@@ -104,7 +95,13 @@ export function agentsRoute({ db }: Deps) {
   return router;
 }
 
-function toApi(row: AgentRow, widgetChannelId: string | null) {
+type ChannelRow = typeof channel.$inferSelect;
+
+function toApi(row: AgentRow, channels: ChannelRow[]) {
+  // The UI expects per-channel slots so it can render "connect" vs "connected"
+  // without filtering on its end.
+  const widget = channels.find((c) => c.kind === 'widget' && c.agentId === row.id) ?? null;
+  const sms = channels.find((c) => c.kind === 'sms' && c.agentId === row.id) ?? null;
   return {
     id: row.id,
     name: row.name,
@@ -112,7 +109,8 @@ function toApi(row: AgentRow, widgetChannelId: string | null) {
     model: row.model,
     runtimeMode: row.runtimeMode,
     voiceEnabled: row.voiceEnabled,
-    widgetChannelId,
+    widgetChannelId: widget?.id ?? null,
+    smsChannel: sms ? { id: sms.id, phoneNumber: sms.address ?? '' } : null,
   };
 }
 
