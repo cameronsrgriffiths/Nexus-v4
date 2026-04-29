@@ -2,7 +2,7 @@
   "name": "nexus-v4",
   "private": true,
   "version": "0.0.0",
-  "workspaces": ["apps/*"],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up",
     "dev:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",

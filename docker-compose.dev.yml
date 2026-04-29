@@ -8,6 +8,7 @@ services:
       - ./apps/server/src:/app/apps/server/src
       - ./apps/server/drizzle:/app/apps/server/drizzle
       - ./apps/server/drizzle.config.ts:/app/apps/server/drizzle.config.ts
+      - ./packages:/app/packages
 
   web:
     build:

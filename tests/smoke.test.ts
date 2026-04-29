@@ -75,3 +75,65 @@ test(
   },
   POLL_TIMEOUT_MS + 30_000,
 );
+
+test(
+  'hitting /healthz produces JSON log lines tagged with a single request_id',
+  async () => {
+    // Wait for /healthz to be ok (the prior test only ran assertions; it doesn't strictly
+    // sequence the start of this one in parallel-test mode — re-poll to be safe).
+    const upDeadline = Date.now() + POLL_TIMEOUT_MS;
+    while (Date.now() < upDeadline) {
+      try {
+        const res = await fetch(HEALTH_URL);
+        if (res.ok) break;
+      } catch {
+        // keep polling
+      }
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+
+    const requestId = `smoke-${crypto.randomUUID()}`;
+    const since = new Date().toISOString();
+
+    const res = await fetch(HEALTH_URL, { headers: { 'x-request-id': requestId } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-request-id')).toBe(requestId);
+
+    // Give the server a moment to flush stdout into docker's log driver.
+    await new Promise((r) => setTimeout(r, 500));
+
+    const logs = await compose(['logs', '--no-color', '--no-log-prefix', '--since', since, 'nexus'], {
+      collect: true,
+    });
+    const rawLines = logs.stdout.split('\n').filter((l) => l.trim().length > 0);
+
+    const matches: Record<string, unknown>[] = [];
+    for (const line of rawLines) {
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(line) as Record<string, unknown>;
+      } catch {
+        // Some lines may be Bun's own startup chatter, not JSON. Skip non-JSON lines.
+        continue;
+      }
+      if (parsed.request_id === requestId) matches.push(parsed);
+    }
+
+    if (matches.length < 2) {
+      throw new Error(
+        `expected at least 2 JSON log lines tagged with request_id=${requestId}, got ${matches.length}\n--- raw logs ---\n${logs.stdout}`,
+      );
+    }
+    for (const rec of matches) {
+      expect(rec.request_id).toBe(requestId);
+      expect(typeof rec.level).toBe('string');
+      expect(typeof rec.msg).toBe('string');
+      expect(typeof rec.time).toBe('string');
+    }
+    // Sanity: at least one start and one end line for the request lifecycle.
+    const messages = matches.map((m) => m.msg);
+    expect(messages).toContain('request.start');
+    expect(messages).toContain('request.end');
+  },
+  POLL_TIMEOUT_MS + 30_000,
+);
