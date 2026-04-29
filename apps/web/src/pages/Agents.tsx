@@ -192,7 +192,7 @@ export function Agents() {
               disabled={submitting}
               className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:opacity-60"
             >
-              {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Create agent'}
+              {submitLabel(submitting, editingId !== null)}
             </button>
             <button
               type="button"
@@ -205,46 +205,12 @@ export function Agents() {
         </form>
       )}
 
-      {loading ? (
-        <p className="text-zinc-400 text-sm">Loading…</p>
-      ) : agents.length === 0 ? (
-        <p data-testid="agents-empty" className="text-zinc-400 text-sm">
-          No agents yet. Create one to get started.
-        </p>
-      ) : (
-        <ul data-testid="agents-list" className="divide-y divide-zinc-800 rounded-lg border border-zinc-800">
-          {agents.map((a) => (
-            <li
-              key={a.id}
-              data-testid={`agent-row-${a.id}`}
-              className="flex items-center justify-between px-4 py-3"
-            >
-              <div className="min-w-0">
-                <div className="font-medium text-zinc-100">{a.name}</div>
-                <div className="truncate text-xs text-zinc-400">
-                  {a.model} · voice {a.voiceEnabled ? 'on' : 'off'}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => startEdit(a)}
-                  className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingDelete({ id: a.id, name: a.name })}
-                  className="rounded-md border border-red-700/60 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <AgentList
+        loading={loading}
+        agents={agents}
+        onEdit={startEdit}
+        onDelete={(a) => setPendingDelete({ id: a.id, name: a.name })}
+      />
 
       {pendingDelete && (
         <div
@@ -280,6 +246,69 @@ export function Agents() {
       )}
     </section>
   );
+}
+
+function AgentList({
+  loading,
+  agents,
+  onEdit,
+  onDelete,
+}: {
+  loading: boolean;
+  agents: Agent[];
+  onEdit: (a: Agent) => void;
+  onDelete: (a: Agent) => void;
+}) {
+  if (loading) {
+    return <p className="text-zinc-400 text-sm">Loading…</p>;
+  }
+  if (agents.length === 0) {
+    return (
+      <p data-testid="agents-empty" className="text-zinc-400 text-sm">
+        No agents yet. Create one to get started.
+      </p>
+    );
+  }
+  return (
+    <ul data-testid="agents-list" className="divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+      {agents.map((a) => (
+        <li
+          key={a.id}
+          data-testid={`agent-row-${a.id}`}
+          className="flex items-center justify-between px-4 py-3"
+        >
+          <div className="min-w-0">
+            <div className="font-medium text-zinc-100">{a.name}</div>
+            <div className="truncate text-xs text-zinc-400">
+              {a.model} · voice {a.voiceEnabled ? 'on' : 'off'}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onEdit(a)}
+              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(a)}
+              className="rounded-md border border-red-700/60 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30"
+            >
+              Delete
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function submitLabel(submitting: boolean, editing: boolean): string {
+  if (submitting) return 'Saving…';
+  if (editing) return 'Save changes';
+  return 'Create agent';
 }
 
 function TextField({
