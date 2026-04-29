@@ -8,8 +8,20 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { knowledgePage } from '../db/schema.ts';
+import { knowledgePage, knowledgeWriteLog } from '../db/schema.ts';
 import type { Embedder } from '../embedding/client.ts';
+
+export type KnowledgeWriteActor = 'agent' | 'operator';
+
+// Context attached to every write so the log row records who issued it. The
+// operator UI's auto-merge / force-overwrite policies read the log back to
+// reason about intervening writes; without an actor distinction "lost agent
+// writes" can't be identified.
+export type WriteContext = {
+  actor: KnowledgeWriteActor;
+};
+
+const DEFAULT_CONTEXT: WriteContext = { actor: 'agent' };
 
 export type KnowledgeScope = 'org' | 'agent' | 'contact';
 
@@ -70,7 +82,7 @@ export type LookupResult =
 
 export type KnowledgeService = {
   search(orgId: string, params: SearchParams): Promise<SearchResult>;
-  write(orgId: string, params: WriteParams): Promise<WriteResult>;
+  write(orgId: string, params: WriteParams, context?: WriteContext): Promise<WriteResult>;
   // Resolve a page by (scope, scopeId, title). Surfaces moved-to redirects
   // so callers (including the retry helper) can follow them without trying
   // a write first.
@@ -121,7 +133,7 @@ export function createKnowledgeService({ db, embedder }: Deps): KnowledgeService
       return { pages: rows as Array<SearchResult['pages'][number]> };
     },
 
-    async write(orgId, params) {
+    async write(orgId, params, context = DEFAULT_CONTEXT) {
       // 1. Look up by (orgId, scope, scopeId, title).
       const existing = await db
         .select({
@@ -175,6 +187,7 @@ export function createKnowledgeService({ db, embedder }: Deps): KnowledgeService
           scopeId: params.scopeId,
           title: params.title,
           content: params.content,
+          actor: context.actor,
         });
       }
 
@@ -208,6 +221,16 @@ export function createKnowledgeService({ db, embedder }: Deps): KnowledgeService
         )
         .returning({ id: knowledgePage.id, version: knowledgePage.version });
       const u = updated[0];
+      if (u) {
+        await db.insert(knowledgeWriteLog).values({
+          pageId: u.id,
+          orgId,
+          versionAfter: u.version,
+          mode: params.mode,
+          actor: context.actor,
+          contentAfter: newContent,
+        });
+      }
       if (!u) {
         // Lost the race against another writer between our read and our update.
         // Re-read and surface as conflict.
@@ -320,6 +343,7 @@ async function insertPage(
     scopeId: string;
     title: string;
     content: string;
+    actor: KnowledgeWriteActor;
   },
 ): Promise<WriteResult> {
   const embedding = await embedder.embed(page.content);
@@ -336,5 +360,13 @@ async function insertPage(
     })
     .returning({ id: knowledgePage.id, version: knowledgePage.version });
   const i = inserted[0]!;
+  await db.insert(knowledgeWriteLog).values({
+    pageId: i.id,
+    orgId: page.orgId,
+    versionAfter: i.version,
+    mode: 'create',
+    actor: page.actor,
+    contentAfter: page.content,
+  });
   return { ok: true, id: i.id, version: i.version };
 }
