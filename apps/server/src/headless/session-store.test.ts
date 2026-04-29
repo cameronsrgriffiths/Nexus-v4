@@ -8,7 +8,7 @@ import { sql } from 'drizzle-orm';
 import { runMigrations, getDb, closeDb } from '../db/client.ts';
 import { startPg, type StartedPg } from '../test-helpers/pg-container.ts';
 import { createSessionStore, OutOfOrderWriteError } from './session-store.ts';
-import { agentSession, agentMessage, agent, contact, identifier, channel, org } from '../db/schema.ts';
+import { agentSession, agent, contact, identifier, channel, org } from '../db/schema.ts';
 
 let pg: StartedPg;
 

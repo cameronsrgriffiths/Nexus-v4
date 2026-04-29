@@ -4,20 +4,11 @@
 // a single session. This is the placeholder timeline the slice ships; #28
 // replaces it with the full operator timeline.
 
-import { Hono, type Context } from 'hono';
-import { getCookie } from 'hono/cookie';
+import { Hono } from 'hono';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import {
-  agent,
-  agentMessage,
-  agentSession,
-  channel,
-  session,
-  user,
-} from '../db/schema.ts';
-
-const SESSION_COOKIE = 'nexus_session';
+import { agent, agentMessage, agentSession, channel } from '../db/schema.ts';
+import { resolveOrgId } from './_session-cookie.ts';
 
 type Deps = { db: PostgresJsDatabase };
 
@@ -77,23 +68,4 @@ export function conversationsRoute({ db }: Deps) {
   });
 
   return router;
-}
-
-async function resolveOrgId(c: Context, db: PostgresJsDatabase): Promise<string | null> {
-  const token = getCookie(c, SESSION_COOKIE);
-  if (!token) return null;
-  const [row] = await db
-    .select({ orgId: user.orgId, expiresAt: session.expiresAt })
-    .from(session)
-    .innerJoin(user, eq(session.userId, user.id))
-    .where(eq(session.tokenHash, hashToken(token)))
-    .limit(1);
-  if (!row || row.expiresAt.getTime() < Date.now()) return null;
-  return row.orgId;
-}
-
-function hashToken(token: string): string {
-  const hasher = new Bun.CryptoHasher('sha256');
-  hasher.update(token);
-  return hasher.digest('hex');
 }
