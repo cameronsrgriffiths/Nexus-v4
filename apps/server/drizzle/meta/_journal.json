@@ -15,6 +15,13 @@
       "when": 1777421351682,
       "tag": "0001_credential",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777467011115,
+      "tag": "0002_auth",
+      "breakpoints": true
     }
   ]
 }

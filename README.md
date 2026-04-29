@@ -84,3 +84,16 @@ bun run smoke
 ```
 
 Allow up to 5 minutes on a cold run (the embedding model is downloaded on first start). Subsequent runs reuse the cached model volume.
+
+## E2E test (auth + dashboard)
+
+Boots a one-off Postgres container, runs migrations, serves the auth API + the
+built React app on a single port, and drives a Chromium browser through register
+→ dashboard → logout → log back in:
+
+```bash
+bun run --filter @nexus/web build
+bun run e2e
+```
+
+The web build is a prerequisite — the e2e server serves `apps/web/dist`.

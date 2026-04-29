@@ -17,6 +17,10 @@ npm-debug.log
 dist/
 apps/*/dist/
 
+# Playwright
+test-results/
+playwright-report/
+
 # Env
 .env
 .env.local
