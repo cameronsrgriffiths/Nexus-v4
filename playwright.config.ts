@@ -19,10 +19,11 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    // Boots a Postgres container, runs migrations, and serves auth API + Vite dist on PORT.
-    command: `bun run apps/server/src/test-helpers/e2e-server.ts`,
+    // Builds the web app, then boots a Postgres container, runs migrations,
+    // and serves the API + built dist on PORT.
+    command: `bun run --filter @nexus/web build && bun run apps/server/src/test-helpers/e2e-server.ts`,
     url: BASE_URL,
-    timeout: 120_000,
+    timeout: 180_000,
     reuseExistingServer: false,
     stdout: 'pipe',
     stderr: 'pipe',
