@@ -24,6 +24,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-nexus_dev_password_change_me}
       MINIO_BUCKET: ${MINIO_BUCKET:-nexus}
       EMBEDDING_URL: http://embedding:7997
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=}
     ports:
       - "${NEXUS_PORT:-3000}:3000"
     restart: unless-stopped

@@ -9,6 +9,7 @@
     "prod": "docker compose up",
     "prod:down": "docker compose down",
     "smoke": "bun test tests/smoke.test.ts",
+    "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
     "build": "bun run --filter '*' build"
   },

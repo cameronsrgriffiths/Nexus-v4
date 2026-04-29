@@ -52,6 +52,14 @@ That brings up the production-shaped stack: a single Nexus container (Hono serve
 
 Override defaults via environment variables — `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`, etc. See the top of [`docker-compose.yml`](./docker-compose.yml) for the full set.
 
+`CREDENTIAL_ENCRYPTION_KEY` encrypts per-org provider credentials at rest. Set it to a base64-encoded 32-byte secret in production:
+
+```bash
+export CREDENTIAL_ENCRYPTION_KEY=$(openssl rand -base64 32)
+```
+
+The compose file ships with a baked-in dev default so a clean checkout boots; rotating away from that default is a self-host step before storing real credentials.
+
 ## Layout
 
 ```
