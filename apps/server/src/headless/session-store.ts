@@ -16,6 +16,9 @@ import { agentMessage } from '../db/schema.ts';
 export type MessageInput = {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  // Channel-specific message id used for threading (e.g. an email Message-ID).
+  // Optional because not every channel uses one.
+  externalId?: string | undefined;
 };
 
 export type StoredMessage = MessageInput & {
@@ -54,7 +57,13 @@ export function createSessionStore({ db }: Deps): SessionStore {
       const sequence = await nextSequence(sessionId);
       const [stored] = await db
         .insert(agentMessage)
-        .values({ sessionId, sequence, role: msg.role, content: msg.content })
+        .values({
+          sessionId,
+          sequence,
+          role: msg.role,
+          content: msg.content,
+          externalId: msg.externalId,
+        })
         .returning();
       return toApi(stored!);
     },
@@ -68,7 +77,13 @@ export function createSessionStore({ db }: Deps): SessionStore {
       }
       const [stored] = await db
         .insert(agentMessage)
-        .values({ sessionId, sequence, role: msg.role, content: msg.content })
+        .values({
+          sessionId,
+          sequence,
+          role: msg.role,
+          content: msg.content,
+          externalId: msg.externalId,
+        })
         .returning();
       return toApi(stored!);
     },
@@ -90,6 +105,7 @@ function toApi(row: typeof agentMessage.$inferSelect): StoredMessage {
     sequence: row.sequence,
     role: row.role,
     content: row.content,
+    externalId: row.externalId ?? undefined,
     createdAt: row.createdAt,
   };
 }

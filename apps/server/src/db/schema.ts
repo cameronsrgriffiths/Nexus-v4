@@ -8,9 +8,34 @@ import {
   uniqueIndex,
   pgEnum,
   integer,
+  index,
 } from 'drizzle-orm/pg-core';
 
 export const runtimeMode = pgEnum('runtime_mode', ['headless', 'dedicated']);
+export const knowledgeScope = pgEnum('knowledge_scope', ['org', 'agent', 'contact']);
+
+const tsvector = customType<{ data: string; default: false }>({
+  dataType() {
+    return 'tsvector';
+  },
+});
+
+// pgvector with a fixed dimension. nomic-embed-text-v1.5 produces 768-dim vectors.
+const vector768 = customType<{ data: number[]; default: false }>({
+  dataType() {
+    return 'vector(768)';
+  },
+  toDriver(value: number[]) {
+    return `[${value.join(',')}]`;
+  },
+  fromDriver(value: unknown) {
+    if (Array.isArray(value)) return value as number[];
+    if (typeof value === 'string') {
+      return JSON.parse(value) as number[];
+    }
+    return [];
+  },
+});
 
 // Channel kinds the platform plans to support; only `widget` is wired in this slice.
 export const channelKind = pgEnum('channel_kind', [
@@ -85,11 +110,52 @@ export const agent = pgTable('agent', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const knowledgePage = pgTable(
+  'knowledge_page',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => org.id, { onDelete: 'cascade' }),
+    scope: knowledgeScope('scope').notNull(),
+    // For org-scoped pages this is the org id; for agent/contact scopes it's the
+    // owning agent or contact id. Keeping it as a single uuid column lets us
+    // index (org_id, scope, scope_id, title) for unique-title-per-scope and
+    // for fast scope lookups without joining through scope-specific tables.
+    scopeId: uuid('scope_id').notNull(),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    version: integer('version').notNull().default(1),
+    // FTS index column. The knowledge service computes it from title+content
+    // on every write so search and write share a single transactional path.
+    tsv: tsvector('tsv').notNull(),
+    embedding: vector768('embedding').notNull(),
+    // When this page has been moved (scope change), points at the new page id.
+    // Writers targeting the old id receive a `page_moved` response with the
+    // new coordinates and retry against the new location.
+    movedTo: uuid('moved_to'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    scopeTitleUnique: uniqueIndex('knowledge_page_scope_title_unique').on(
+      t.orgId,
+      t.scope,
+      t.scopeId,
+      t.title,
+    ),
+    scopeIdx: index('knowledge_page_scope_idx').on(t.orgId, t.scope, t.scopeId),
+  }),
+);
+
 // Channel: an addressable surface (one row per agent×channel binding). For the
 // widget, every agent installation has its own channel row; later channels
 // (SMS, voice, etc.) follow the same pattern. `address` is the channel-side
-// handle the platform owns — the Twilio phone number for SMS, the inbox for
-// email, etc. NULL for widget channels (the widget id IS the channel id).
+// handle the platform owns — the Twilio phone number for SMS, etc. NULL for
+// widget channels (the widget id IS the channel id).
+//
+// `emailAddress` / `mailtrapInboxId` are email-specific holdovers from the
+// email slice; a follow-up should collapse these into `address`.
 export const channel = pgTable(
   'channel',
   {
@@ -102,6 +168,8 @@ export const channel = pgTable(
       .notNull()
       .references(() => agent.id, { onDelete: 'cascade' }),
     address: text('address'),
+    emailAddress: text('email_address'),
+    mailtrapInboxId: text('mailtrap_inbox_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -165,6 +233,9 @@ export const agentSession = pgTable('agent_session', {
 // Agent message: append-only log of turns within a session. PRD invariant #5
 // requires monotonic, gap-free sequence numbers — enforced in session-store.ts
 // and pinned by a unique index on (session, sequence).
+//
+// `externalId` carries the channel-specific message id used for threading
+// (e.g. an email Message-ID). Nullable because not every channel needs it.
 export const agentMessage = pgTable(
   'agent_message',
   {
@@ -175,12 +246,34 @@ export const agentMessage = pgTable(
     sequence: integer('sequence').notNull(),
     role: messageRole('role').notNull(),
     content: text('content').notNull(),
+    externalId: text('external_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     sessionSequenceUnique: uniqueIndex('agent_message_session_sequence_unique').on(
       t.sessionId,
       t.sequence,
+    ),
+  }),
+);
+
+// Inbound dedupe for poll-based channels. The email poller writes one row per
+// (channel, mailtrap message id) so a re-poll doesn't re-dispatch a message
+// already handled. Unique index makes the insert idempotent.
+export const channelInboundSeen = pgTable(
+  'channel_inbound_seen',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    channelId: uuid('channel_id')
+      .notNull()
+      .references(() => channel.id, { onDelete: 'cascade' }),
+    externalId: text('external_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    channelExternalUnique: uniqueIndex('channel_inbound_seen_channel_external_unique').on(
+      t.channelId,
+      t.externalId,
     ),
   }),
 );

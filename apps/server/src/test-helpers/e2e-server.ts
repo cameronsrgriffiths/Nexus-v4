@@ -17,6 +17,7 @@ import { agentsRoute } from '../routes/agents.ts';
 import { widgetRoute } from '../routes/widget.ts';
 import { conversationsRoute } from '../routes/conversations.ts';
 import { channelsRoute } from '../routes/channels.ts';
+import { emailRoute } from '../routes/email.ts';
 import { mountStatic } from '../routes/static.ts';
 import { createCredentialService } from '../credentials/service.ts';
 import { createHeadlessRuntime } from '../headless/runtime.ts';
@@ -33,10 +34,10 @@ const sessionRoot = await mkdtemp(join(tmpdir(), 'nexus-e2e-sessions-'));
 const app = new Hono();
 const db = getDb(pg.url);
 
-// Test-only encryption key (32 zero bytes base64). Production wires through env.
+// 32-byte key, base64-encoded — only used by the e2e suite.
 const credentials = createCredentialService({
   db,
-  encryptionKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+  encryptionKey: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=',
 });
 
 // Deterministic stub for E2E so the test doesn't need network access or an
@@ -64,6 +65,7 @@ app.route('/api/auth', authRoute({ db }));
 app.route('/api/agents', agentsRoute({ db }));
 app.route('/api/conversations', conversationsRoute({ db }));
 app.route('/api/channels', channelsRoute({ db, credentials }));
+app.route('/api/email', emailRoute({ db, credentials }));
 app.route('/widget', widgetRoute({ db, sessionRoot, invokeAgent }));
 app.route('/sms', smsRoute({ db, credentials, runtime, twilioFetch }));
 mountStatic(app);

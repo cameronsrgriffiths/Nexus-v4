@@ -41,7 +41,21 @@
       "idx": 5,
       "version": "7",
       "when": 1777600000000,
-      "tag": "0005_channel_address",
+      "tag": "0005_email_channel",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777700000000,
+      "tag": "0006_knowledge",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777800000000,
+      "tag": "0007_channel_address",
       "breakpoints": true
     }
   ]

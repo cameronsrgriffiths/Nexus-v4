@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { ConnectEmailDialog } from './ConnectEmailDialog';
 
 export type Agent = {
   id: string;
@@ -48,6 +49,7 @@ export function Agents() {
   const [draft, setDraft] = useState<FormDraft>(EMPTY_DRAFT);
   const [submitting, setSubmitting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<DeleteTarget | null>(null);
+  const [connectEmailFor, setConnectEmailFor] = useState<Agent | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -227,7 +229,19 @@ export function Agents() {
         onSmsConnected={() => {
           void refresh();
         }}
+        onConnectEmail={(a) => setConnectEmailFor(a)}
       />
+
+      {connectEmailFor && (
+        <ConnectEmailDialog
+          agent={connectEmailFor}
+          onClose={() => setConnectEmailFor(null)}
+          onConnected={() => {
+            setConnectEmailFor(null);
+            void refresh();
+          }}
+        />
+      )}
 
       {pendingDelete && (
         <div
@@ -271,12 +285,14 @@ function AgentList({
   onEdit,
   onDelete,
   onSmsConnected,
+  onConnectEmail,
 }: {
   loading: boolean;
   agents: Agent[];
   onEdit: (a: Agent) => void;
   onDelete: (a: Agent) => void;
   onSmsConnected: () => void;
+  onConnectEmail: (a: Agent) => void;
 }) {
   const [openSmsAgentId, setOpenSmsAgentId] = useState<string | null>(null);
   if (loading) {
@@ -333,6 +349,14 @@ function AgentList({
                   {openSmsAgentId === a.id ? 'Cancel' : 'Connect SMS'}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => onConnectEmail(a)}
+                data-testid={`connect-email-${a.id}`}
+                className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+              >
+                Connect email
+              </button>
               <button
                 type="button"
                 onClick={() => onEdit(a)}
