@@ -8,6 +8,7 @@ import { healthRoute } from './routes/health.ts';
 import { mountStatic } from './routes/static.ts';
 import { createCredentialService } from './credentials/service.ts';
 import { authRoute } from './routes/auth.ts';
+import { agentsRoute } from './routes/agents.ts';
 
 const env = loadEnv();
 
@@ -24,6 +25,7 @@ const app = new Hono();
 app.use('*', requestLogger({ logger: log }));
 app.route('/healthz', healthRoute({ env, db }));
 app.route('/api/auth', authRoute({ db }));
+app.route('/api/agents', agentsRoute({ db }));
 mountStatic(app);
 
 const server = Bun.serve({

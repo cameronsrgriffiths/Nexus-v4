@@ -1,4 +1,15 @@
-import { pgTable, uuid, text, timestamp, boolean, customType, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  boolean,
+  customType,
+  uniqueIndex,
+  pgEnum,
+} from 'drizzle-orm/pg-core';
+
+export const runtimeMode = pgEnum('runtime_mode', ['headless', 'dedicated']);
 
 const bytea = customType<{ data: Buffer; default: false }>({
   dataType() {
@@ -36,6 +47,20 @@ export const health = pgTable('health', {
   id: uuid('id').primaryKey().defaultRandom(),
   ok: boolean('ok').notNull().default(true),
   bootedAt: timestamp('booted_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const agent = pgTable('agent', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orgId: uuid('org_id')
+    .notNull()
+    .references(() => org.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  persona: text('persona').notNull(),
+  model: text('model').notNull(),
+  runtimeMode: runtimeMode('runtime_mode').notNull().default('headless'),
+  voiceEnabled: boolean('voice_enabled').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const credential = pgTable(

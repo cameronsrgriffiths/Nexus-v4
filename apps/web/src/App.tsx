@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/auth';
 import { AppShell } from './layout/AppShell';
+import { Agents } from './pages/Agents';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -15,6 +16,7 @@ export function App() {
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
               <Route index element={<Dashboard />} />
+              <Route path="/agents" element={<Agents />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
