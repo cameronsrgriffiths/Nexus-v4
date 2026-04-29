@@ -8,14 +8,9 @@
 // the same code path that handles inbound creates/looks up the session for
 // outbound-first conversations.
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import {
-  agentMessage,
-  agentSession,
-  channel as channelTable,
-  channelInboundSeen,
-} from '../db/schema.ts';
+import { channel as channelTable, channelInboundSeen } from '../db/schema.ts';
 import type { MailtrapClient } from './client.ts';
 import { createSessionStore } from '../headless/session-store.ts';
 import type { createHeadlessRuntime } from '../headless/runtime.ts';
@@ -137,8 +132,7 @@ export function createEmailChannel({ db, client, runtime }: EmailChannelDeps) {
   return { pollChannel, sendOutbound };
 }
 
-// Re-export for callers that need to know the threaded subject convention.
-export function replySubject(original: string): string {
+function replySubject(original: string): string {
   if (/^re:/i.test(original)) return original;
   return `Re: ${original}`;
 }
@@ -146,7 +140,7 @@ export function replySubject(original: string): string {
 // RFC 5322 Message-ID with the channel's email domain so it looks plausible
 // in a real client. The local part is randomized so two outbound sends never
 // collide.
-export function generateMessageId(fromAddress: string): string {
+function generateMessageId(fromAddress: string): string {
   const domain = fromAddress.split('@')[1] ?? 'nexus.local';
   return `<${crypto.randomUUID()}@${domain}>`;
 }
