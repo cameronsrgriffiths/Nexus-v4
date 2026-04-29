@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { Hono } from 'hono';
-import { createLogger, getContext } from '../src/index.ts';
+import { createLogger } from '../src/index.ts';
 import { requestLogger } from '../src/hono.ts';
 
 test('middleware tags every log line within the request with a stable request_id', async () => {

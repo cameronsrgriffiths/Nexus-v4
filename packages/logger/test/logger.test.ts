@@ -1,13 +1,6 @@
 import { test, expect } from 'bun:test';
 import { createLogger, withContext } from '../src/index.ts';
 
-function captureLines(fn: () => void): string[] {
-  const lines: string[] = [];
-  const sink = (line: string) => lines.push(line);
-  fn.call({ sink });
-  return lines;
-}
-
 test('logger emits a JSON line to its sink with level and msg', () => {
   const lines: string[] = [];
   const log = createLogger({ sink: (l) => lines.push(l) });
