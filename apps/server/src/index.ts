@@ -14,8 +14,11 @@ import { authRoute } from './routes/auth.ts';
 import { agentsRoute } from './routes/agents.ts';
 import { widgetRoute } from './routes/widget.ts';
 import { conversationsRoute } from './routes/conversations.ts';
+import { channelsRoute } from './routes/channels.ts';
 import { emailRoute } from './routes/email.ts';
 import { createWorkerPool } from './headless/worker-pool.ts';
+import { createHeadlessRuntime } from './headless/runtime.ts';
+import { smsRoute } from './sms/route.ts';
 
 const env = loadEnv();
 
@@ -42,24 +45,27 @@ const workerPool = createWorkerPool({ workerPath });
 
 const app = new Hono();
 
+// One runtime instance shared across the widget and SMS channels — both go
+// through the same resolveSession code path (PRD invariant #10).
+const invokeAgent = (
+  options: Parameters<typeof workerPool.dispatch>[1],
+  history: Parameters<typeof workerPool.dispatch>[2],
+) =>
+  // The session id IS the cwd's last path segment — keep it as the worker
+  // pool key so each session has its own Worker (PRD per-session crash
+  // isolation).
+  workerPool.dispatch(options.cwd, options, history);
+const runtime = createHeadlessRuntime({ db, sessionRoot, invokeAgent });
+
 app.use('*', requestLogger({ logger: log }));
 app.route('/healthz', healthRoute({ env, db }));
 app.route('/api/auth', authRoute({ db }));
 app.route('/api/agents', agentsRoute({ db }));
 app.route('/api/conversations', conversationsRoute({ db }));
+app.route('/api/channels', channelsRoute({ db, credentials }));
 app.route('/api/email', emailRoute({ db, credentials }));
-app.route(
-  '/widget',
-  widgetRoute({
-    db,
-    sessionRoot,
-    invokeAgent: (options, history) =>
-      // The session id IS the cwd's last path segment — keep it as the worker
-      // pool key so each session has its own Worker (PRD per-session crash
-      // isolation).
-      workerPool.dispatch(options.cwd, options, history),
-  }),
-);
+app.route('/widget', widgetRoute({ db, sessionRoot, invokeAgent }));
+app.route('/sms', smsRoute({ db, credentials, runtime }));
 mountStatic(app);
 
 const server = Bun.serve({

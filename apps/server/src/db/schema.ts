@@ -150,25 +150,35 @@ export const knowledgePage = pgTable(
 
 // Channel: an addressable surface (one row per agent×channel binding). For the
 // widget, every agent installation has its own channel row; later channels
-// (SMS, voice, etc.) follow the same pattern.
+// (SMS, voice, etc.) follow the same pattern. `address` is the channel-side
+// handle the platform owns — the Twilio phone number for SMS, etc. NULL for
+// widget channels (the widget id IS the channel id).
 //
-// Email-specific columns (`emailAddress`, `mailtrapInboxId`) live here as
-// nullable: the widget kind doesn't need them, and adding a side-table for
-// kind-specific config is overkill for the small set of fields the email
-// channel needs in this slice.
-export const channel = pgTable('channel', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  orgId: uuid('org_id')
-    .notNull()
-    .references(() => org.id, { onDelete: 'cascade' }),
-  kind: channelKind('kind').notNull(),
-  agentId: uuid('agent_id')
-    .notNull()
-    .references(() => agent.id, { onDelete: 'cascade' }),
-  emailAddress: text('email_address'),
-  mailtrapInboxId: text('mailtrap_inbox_id'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+// `emailAddress` / `mailtrapInboxId` are email-specific holdovers from the
+// email slice; a follow-up should collapse these into `address`.
+export const channel = pgTable(
+  'channel',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => org.id, { onDelete: 'cascade' }),
+    kind: channelKind('kind').notNull(),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agent.id, { onDelete: 'cascade' }),
+    address: text('address'),
+    emailAddress: text('email_address'),
+    mailtrapInboxId: text('mailtrap_inbox_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // Prevents two channels of the same kind from claiming the same address
+    // (e.g. two SMS channels on the same Twilio number) so inbound resolution
+    // is unambiguous.
+    kindAddressUnique: uniqueIndex('channel_kind_address_unique').on(t.kind, t.address),
+  }),
+);
 
 // Contact: a person/end-user. Identifiers below carry the channel-specific
 // addresses that resolve to a contact. `do_not_contact` is honored by every
