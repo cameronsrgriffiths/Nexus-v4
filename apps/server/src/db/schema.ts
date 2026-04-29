@@ -151,11 +151,11 @@ export const knowledgePage = pgTable(
 // Channel: an addressable surface (one row per agent×channel binding). For the
 // widget, every agent installation has its own channel row; later channels
 // (SMS, voice, etc.) follow the same pattern. `address` is the channel-side
-// handle the platform owns — the Twilio phone number for SMS, etc. NULL for
-// widget channels (the widget id IS the channel id).
-//
-// `emailAddress` / `mailtrapInboxId` are email-specific holdovers from the
-// email slice; a follow-up should collapse these into `address`.
+// handle the platform owns — the Twilio phone number for SMS, the reply-from
+// email for an email channel, etc. NULL for widget channels (the widget id IS
+// the channel id). `mailtrapInboxId` is email-specific; Mailtrap's HTTP API
+// uses it as a path param for inbox polling, so it can't collapse into
+// `address`.
 export const channel = pgTable(
   'channel',
   {
@@ -168,7 +168,6 @@ export const channel = pgTable(
       .notNull()
       .references(() => agent.id, { onDelete: 'cascade' }),
     address: text('address'),
-    emailAddress: text('email_address'),
     mailtrapInboxId: text('mailtrap_inbox_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

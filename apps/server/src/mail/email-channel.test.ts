@@ -61,7 +61,7 @@ async function seedEmailChannel(): Promise<{
       orgId: o!.id,
       kind: 'email',
       agentId: a!.id,
-      emailAddress,
+      address: emailAddress,
       mailtrapInboxId: INBOX_ID,
     })
     .returning();
