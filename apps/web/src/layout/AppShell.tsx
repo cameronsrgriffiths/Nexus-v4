@@ -13,6 +13,7 @@ export function AppShell() {
           <SideLink to="/" label="Dashboard" />
           <SideLink to="/agents" label="Agents" />
           <SideLink to="/conversations" label="Conversations" />
+          <SideLink to="/analytics" label="Analytics" />
         </nav>
         <div className="mt-auto pt-4 border-t border-zinc-800 text-xs text-zinc-400">
           <div data-testid="signed-in-as" className="px-2 truncate">
