@@ -5,8 +5,9 @@ import { loadEnv } from './env.ts';
 import { runMigrations, getDb, closeDb } from './db/client.ts';
 import { ensureBucket } from './storage/minio.ts';
 import { healthRoute } from './routes/health.ts';
-import { staticRoute } from './routes/static.ts';
+import { mountStatic } from './routes/static.ts';
 import { createCredentialService } from './credentials/service.ts';
+import { authRoute } from './routes/auth.ts';
 
 const env = loadEnv();
 
@@ -22,7 +23,8 @@ const app = new Hono();
 
 app.use('*', requestLogger({ logger: log }));
 app.route('/healthz', healthRoute({ env, db }));
-app.route('/', staticRoute());
+app.route('/api/auth', authRoute({ db }));
+mountStatic(app);
 
 const server = Bun.serve({
   port: env.PORT,

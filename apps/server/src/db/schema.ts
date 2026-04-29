@@ -18,7 +18,18 @@ export const user = pgTable('user', {
     .notNull()
     .references(() => org.id, { onDelete: 'cascade' }),
   email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const session = pgTable('session', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });
 
 export const health = pgTable('health', {
