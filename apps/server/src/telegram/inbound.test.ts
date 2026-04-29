@@ -16,8 +16,6 @@ import { startPg, type StartedPg } from '../test-helpers/pg-container.ts';
 import { agent, channel, org } from '../db/schema.ts';
 import { createHeadlessRuntime } from '../headless/runtime.ts';
 import { createCredentialService } from '../credentials/service.ts';
-import { authRoute } from '../routes/auth.ts';
-import { conversationsRoute } from '../routes/conversations.ts';
 import { telegramRoute } from './route.ts';
 import type { FetchLike } from './telegram.ts';
 
@@ -60,8 +58,6 @@ beforeAll(async () => {
     });
   };
 
-  app.route('/api/auth', authRoute({ db }));
-  app.route('/api/conversations', conversationsRoute({ db }));
   app.route('/telegram', telegramRoute({ db, credentials, runtime, telegramFetch }));
 }, 120_000);
 

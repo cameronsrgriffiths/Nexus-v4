@@ -576,10 +576,11 @@ function TelegramConnectForm({
   }
 
   // Pull the bot id (digits before the colon) so we can preview the inbound
-  // webhook URL the operator pastes back into Telegram via setWebhook.
-  const botId = /^(\d+):/.exec(draft.botToken)?.[1];
+  // webhook URL the operator pastes back into Telegram via setWebhook. Falls
+  // back to a placeholder until the operator pastes a parseable token.
+  const botId = /^(\d+):/.exec(draft.botToken)?.[1] ?? '<bot_id>';
   const origin = typeof window === 'undefined' ? '' : window.location.origin;
-  const webhookUrl = botId ? `${origin}/telegram/webhook/${botId}` : null;
+  const webhookUrl = `${origin}/telegram/webhook/${botId}`;
 
   return (
     <form
@@ -607,8 +608,7 @@ function TelegramConnectForm({
         <p className="mt-1">
           Tell Telegram where to deliver inbound messages by calling{' '}
           <code className="rounded bg-zinc-800 px-1 font-mono">
-            https://api.telegram.org/bot&lt;token&gt;/setWebhook?url=
-            {webhookUrl ?? `${origin}/telegram/webhook/<bot_id>`}
+            https://api.telegram.org/bot&lt;token&gt;/setWebhook?url={webhookUrl}
           </code>{' '}
           once. We resolve the bot from the URL on every update.
         </p>
