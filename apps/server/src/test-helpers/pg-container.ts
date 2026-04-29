@@ -2,7 +2,10 @@
 // We don't use testcontainers-node because it occasionally hangs under Bun
 // on macOS while validating the listening-ports wait strategy.
 
-const IMAGE = 'postgres:16-alpine';
+// pgvector/pgvector:pg16 — same image production uses (docker-compose.yml).
+// We can't fall back to plain postgres here because migrations enable the
+// `vector` extension at startup.
+const IMAGE = 'pgvector/pgvector:pg16';
 
 export type StartedPg = {
   url: string;
