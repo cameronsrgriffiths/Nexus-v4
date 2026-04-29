@@ -16,7 +16,9 @@ import { authRoute } from '../routes/auth.ts';
 import { agentsRoute } from '../routes/agents.ts';
 import { widgetRoute } from '../routes/widget.ts';
 import { conversationsRoute } from '../routes/conversations.ts';
+import { emailRoute } from '../routes/email.ts';
 import { mountStatic } from '../routes/static.ts';
+import { createCredentialService } from '../credentials/service.ts';
 
 const port = Number.parseInt(process.env.E2E_PORT ?? '4173', 10);
 
@@ -29,9 +31,16 @@ const sessionRoot = await mkdtemp(join(tmpdir(), 'nexus-e2e-sessions-'));
 const app = new Hono();
 const db = getDb(pg.url);
 
+// 32-byte key, base64-encoded — only used by the e2e suite.
+const credentials = createCredentialService({
+  db,
+  encryptionKey: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=',
+});
+
 app.route('/api/auth', authRoute({ db }));
 app.route('/api/agents', agentsRoute({ db }));
 app.route('/api/conversations', conversationsRoute({ db }));
+app.route('/api/email', emailRoute({ db, credentials }));
 app.route(
   '/widget',
   widgetRoute({
