@@ -10,6 +10,7 @@ import { Hono } from 'hono';
 import { startPg } from './pg-container.ts';
 import { runMigrations, getDb, closeDb } from '../db/client.ts';
 import { authRoute } from '../routes/auth.ts';
+import { agentsRoute } from '../routes/agents.ts';
 import { mountStatic } from '../routes/static.ts';
 
 const port = Number.parseInt(process.env.E2E_PORT ?? '4173', 10);
@@ -22,6 +23,7 @@ const app = new Hono();
 const db = getDb(pg.url);
 
 app.route('/api/auth', authRoute({ db }));
+app.route('/api/agents', agentsRoute({ db }));
 mountStatic(app);
 
 const server = Bun.serve({ port, fetch: app.fetch });
