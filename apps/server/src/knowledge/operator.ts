@@ -17,7 +17,7 @@
 
 import { and, eq, gt, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { knowledgePage, knowledgeWriteLog } from '../db/schema.ts';
+import { knowledgeWriteLog } from '../db/schema.ts';
 import type { KnowledgeService, KnowledgeScope, WriteParams, WriteResult } from './service.ts';
 import type { Embedder } from '../embedding/client.ts';
 
@@ -305,9 +305,3 @@ function mapWriteResult(result: WriteResult, autoMerged: boolean): OperatorSaveR
   throw new Error(`unexpected operator-save service result: ${result.reason}`);
 }
 
-// Avoid an unused-import warning when this file is consumed without the type.
-export type { KnowledgeService };
-
-// (knowledgePage import is kept around for future operator helpers that read
-// page metadata directly; right now we go through the service.)
-void knowledgePage;

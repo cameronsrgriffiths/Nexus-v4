@@ -22,7 +22,7 @@ const SaveBody = v.object({
   scopeId: v.pipe(v.string(), v.minLength(1)),
   title: v.pipe(v.string(), v.minLength(1), v.maxLength(255)),
   mode: v.picklist(['append', 'overwrite'] as const),
-  content: v.pipe(v.string()),
+  content: v.string(),
   version: v.pipe(v.number(), v.integer(), v.minValue(1)),
 });
 
@@ -30,7 +30,7 @@ const ForceBody = v.object({
   scope: ScopeSchema,
   scopeId: v.pipe(v.string(), v.minLength(1)),
   title: v.pipe(v.string(), v.minLength(1), v.maxLength(255)),
-  content: v.pipe(v.string()),
+  content: v.string(),
 });
 
 type Deps = { db: PostgresJsDatabase; service: KnowledgeService };

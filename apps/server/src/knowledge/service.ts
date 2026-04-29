@@ -221,16 +221,6 @@ export function createKnowledgeService({ db, embedder }: Deps): KnowledgeService
         )
         .returning({ id: knowledgePage.id, version: knowledgePage.version });
       const u = updated[0];
-      if (u) {
-        await db.insert(knowledgeWriteLog).values({
-          pageId: u.id,
-          orgId,
-          versionAfter: u.version,
-          mode: params.mode,
-          actor: context.actor,
-          contentAfter: newContent,
-        });
-      }
       if (!u) {
         // Lost the race against another writer between our read and our update.
         // Re-read and surface as conflict.
@@ -248,6 +238,14 @@ export function createKnowledgeService({ db, embedder }: Deps): KnowledgeService
           id: current.id,
         };
       }
+      await db.insert(knowledgeWriteLog).values({
+        pageId: u.id,
+        orgId,
+        versionAfter: u.version,
+        mode: params.mode,
+        actor: context.actor,
+        contentAfter: newContent,
+      });
       return { ok: true, id: u.id, version: u.version };
     },
 
