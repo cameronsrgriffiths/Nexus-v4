@@ -137,6 +137,33 @@ export function createHeadlessRuntime({ db, sessionRoot, invokeAgent }: Deps) {
     return reply;
   }
 
+  // Materialize the SDK cwd, build the SDK options, invoke the agent over
+  // the session's full message history, and return the reply text. Does NOT
+  // append the result — callers that need to attach channel-specific metadata
+  // (e.g. an email Message-ID) to the assistant turn handle persistence
+  // themselves.
+  async function invokeOverHistory(resolved: {
+    sessionId: string;
+    persona: string;
+    model: string;
+  }): Promise<string> {
+    const materialized = await materializeSession({
+      sessionRoot,
+      sessionId: resolved.sessionId,
+      skills: [],
+      subagents: [],
+    });
+    const options = buildSdkOptions({
+      cwd: materialized.cwd,
+      model: resolved.model,
+      persona: resolved.persona,
+    });
+    const history = (await store.list(resolved.sessionId)).map(
+      (m): AgentTurn => ({ role: m.role, content: m.content }),
+    );
+    return invokeAgent(options, history);
+  }
+
   return {
     async handleInbound(args: InboundArgs): Promise<InboundResult> {
       const { sessionId, persona, model } = await resolveSession(args);
@@ -148,7 +175,12 @@ export function createHeadlessRuntime({ db, sessionRoot, invokeAgent }: Deps) {
       return store.list(sessionId);
     },
 
-    // Exposed so future code (outbound send in #10) can share the resolver.
+    // Exposed so the outbound path (e.g. email channel) can share the
+    // resolver — invariant #10.
     resolveSession,
+
+    // Exposed for channels that handle their own persistence (e.g. email,
+    // which carries an external Message-ID on every turn).
+    invokeOverHistory,
   };
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { ConnectEmailDialog } from './ConnectEmailDialog';
 
 export type Agent = {
   id: string;
@@ -35,6 +36,7 @@ export function Agents() {
   const [draft, setDraft] = useState<FormDraft>(EMPTY_DRAFT);
   const [submitting, setSubmitting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<DeleteTarget | null>(null);
+  const [connectEmailFor, setConnectEmailFor] = useState<Agent | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -211,7 +213,19 @@ export function Agents() {
         agents={agents}
         onEdit={startEdit}
         onDelete={(a) => setPendingDelete({ id: a.id, name: a.name })}
+        onConnectEmail={(a) => setConnectEmailFor(a)}
       />
+
+      {connectEmailFor && (
+        <ConnectEmailDialog
+          agent={connectEmailFor}
+          onClose={() => setConnectEmailFor(null)}
+          onConnected={() => {
+            setConnectEmailFor(null);
+            void refresh();
+          }}
+        />
+      )}
 
       {pendingDelete && (
         <div
@@ -254,11 +268,13 @@ function AgentList({
   agents,
   onEdit,
   onDelete,
+  onConnectEmail,
 }: {
   loading: boolean;
   agents: Agent[];
   onEdit: (a: Agent) => void;
   onDelete: (a: Agent) => void;
+  onConnectEmail: (a: Agent) => void;
 }) {
   if (loading) {
     return <p className="text-zinc-400 text-sm">Loading…</p>;
@@ -293,6 +309,14 @@ function AgentList({
             )}
           </div>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onConnectEmail(a)}
+              data-testid={`connect-email-${a.id}`}
+              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+            >
+              Connect email
+            </button>
             <button
               type="button"
               onClick={() => onEdit(a)}

@@ -88,6 +88,11 @@ export const agent = pgTable('agent', {
 // Channel: an addressable surface (one row per agent×channel binding). For the
 // widget, every agent installation has its own channel row; later channels
 // (SMS, voice, etc.) follow the same pattern.
+//
+// Email-specific columns (`emailAddress`, `mailtrapInboxId`) live here as
+// nullable: the widget kind doesn't need them, and adding a side-table for
+// kind-specific config is overkill for the small set of fields the email
+// channel needs in this slice.
 export const channel = pgTable('channel', {
   id: uuid('id').primaryKey().defaultRandom(),
   orgId: uuid('org_id')
@@ -97,6 +102,8 @@ export const channel = pgTable('channel', {
   agentId: uuid('agent_id')
     .notNull()
     .references(() => agent.id, { onDelete: 'cascade' }),
+  emailAddress: text('email_address'),
+  mailtrapInboxId: text('mailtrap_inbox_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -153,6 +160,9 @@ export const agentSession = pgTable('agent_session', {
 // Agent message: append-only log of turns within a session. PRD invariant #5
 // requires monotonic, gap-free sequence numbers — enforced in session-store.ts
 // and pinned by a unique index on (session, sequence).
+//
+// `externalId` carries the channel-specific message id used for threading
+// (e.g. an email Message-ID). Nullable because not every channel needs it.
 export const agentMessage = pgTable(
   'agent_message',
   {
@@ -163,12 +173,34 @@ export const agentMessage = pgTable(
     sequence: integer('sequence').notNull(),
     role: messageRole('role').notNull(),
     content: text('content').notNull(),
+    externalId: text('external_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     sessionSequenceUnique: uniqueIndex('agent_message_session_sequence_unique').on(
       t.sessionId,
       t.sequence,
+    ),
+  }),
+);
+
+// Inbound dedupe for poll-based channels. The email poller writes one row per
+// (channel, mailtrap message id) so a re-poll doesn't re-dispatch a message
+// already handled. Unique index makes the insert idempotent.
+export const channelInboundSeen = pgTable(
+  'channel_inbound_seen',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    channelId: uuid('channel_id')
+      .notNull()
+      .references(() => channel.id, { onDelete: 'cascade' }),
+    externalId: text('external_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    channelExternalUnique: uniqueIndex('channel_inbound_seen_channel_external_unique').on(
+      t.channelId,
+      t.externalId,
     ),
   }),
 );

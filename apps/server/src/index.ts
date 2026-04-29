@@ -14,6 +14,7 @@ import { authRoute } from './routes/auth.ts';
 import { agentsRoute } from './routes/agents.ts';
 import { widgetRoute } from './routes/widget.ts';
 import { conversationsRoute } from './routes/conversations.ts';
+import { emailRoute } from './routes/email.ts';
 import { createWorkerPool } from './headless/worker-pool.ts';
 
 const env = loadEnv();
@@ -24,7 +25,10 @@ await ensureBucket(env);
 const db = getDb(env.DATABASE_URL);
 // Instantiating here surfaces a bad CREDENTIAL_ENCRYPTION_KEY at startup
 // rather than on first credential write.
-createCredentialService({ db, encryptionKey: env.CREDENTIAL_ENCRYPTION_KEY });
+const credentials = createCredentialService({
+  db,
+  encryptionKey: env.CREDENTIAL_ENCRYPTION_KEY,
+});
 
 // Per-session SDK working directories live under sessionRoot. Its ancestors
 // are the runtime data dir and the project root — neither contains SDK
@@ -43,6 +47,7 @@ app.route('/healthz', healthRoute({ env, db }));
 app.route('/api/auth', authRoute({ db }));
 app.route('/api/agents', agentsRoute({ db }));
 app.route('/api/conversations', conversationsRoute({ db }));
+app.route('/api/email', emailRoute({ db, credentials }));
 app.route(
   '/widget',
   widgetRoute({
