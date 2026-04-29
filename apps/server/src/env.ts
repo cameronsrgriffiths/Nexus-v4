@@ -23,6 +23,7 @@ const EnvSchema = v.object({
   MINIO_SECRET_KEY: v.pipe(v.string(), v.minLength(1)),
   MINIO_BUCKET: v.pipe(v.string(), v.minLength(1)),
   EMBEDDING_URL: v.pipe(v.string(), v.url()),
+  CREDENTIAL_ENCRYPTION_KEY: v.pipe(v.string(), v.minLength(1)),
 });
 
 export type Env = v.InferOutput<typeof EnvSchema>;
