@@ -29,3 +29,6 @@ playwright-report/
 # Local Claude state (per-machine, not shared)
 .claude/settings.local.json
 .claude/.cache/
+
+# Headless runtime materialization root (per-session SDK working dirs)
+.nexus-runtime/

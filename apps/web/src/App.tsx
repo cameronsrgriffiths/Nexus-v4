@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { AuthProvider, useAuth } from './auth/auth';
 import { AppShell } from './layout/AppShell';
 import { Agents } from './pages/Agents';
+import { Conversations } from './pages/Conversations';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -17,6 +18,7 @@ export function App() {
             <Route element={<AppShell />}>
               <Route index element={<Dashboard />} />
               <Route path="/agents" element={<Agents />} />
+              <Route path="/conversations" element={<Conversations />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

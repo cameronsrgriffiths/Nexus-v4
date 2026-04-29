@@ -1,11 +1,9 @@
-import { Hono, type Context } from 'hono';
-import { getCookie } from 'hono/cookie';
+import { Hono } from 'hono';
 import * as v from 'valibot';
 import { and, eq } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { agent, session, user } from '../db/schema.ts';
-
-const SESSION_COOKIE = 'nexus_session';
+import { agent, channel } from '../db/schema.ts';
+import { resolveOrgId } from './_session-cookie.ts';
 
 // Headless is the only mode the UI exposes at this slice. The schema accepts
 // `dedicated` so a later slice can flip it on without a migration.
@@ -26,8 +24,21 @@ export function agentsRoute({ db }: Deps) {
   router.get('/', async (c) => {
     const orgId = await resolveOrgId(c, db);
     if (!orgId) return c.json({ error: 'unauthenticated' }, 401);
-    const rows = await db.select().from(agent).where(eq(agent.orgId, orgId));
-    return c.json({ agents: rows.map(toApi) }, 200);
+    const rows = await db
+      .select({
+        agent,
+        widgetChannelId: channel.id,
+      })
+      .from(agent)
+      .leftJoin(
+        channel,
+        and(eq(channel.agentId, agent.id), eq(channel.kind, 'widget')),
+      )
+      .where(eq(agent.orgId, orgId));
+    return c.json(
+      { agents: rows.map((r) => toApi(r.agent, r.widgetChannelId ?? null)) },
+      200,
+    );
   });
 
   router.post('/', async (c) => {
@@ -43,7 +54,15 @@ export function agentsRoute({ db }: Deps) {
       .insert(agent)
       .values({ orgId, name, persona, model, voiceEnabled })
       .returning();
-    return c.json({ agent: toApi(created!) }, 201);
+    // Auto-provision a widget channel: every agent ships with a widget by
+    // default. Future slices can let the operator manage channels explicitly;
+    // for now, the agent and its widget are 1:1 so the operator can grab the
+    // channel id and embed the widget immediately.
+    const [widgetChannel] = await db
+      .insert(channel)
+      .values({ orgId, kind: 'widget', agentId: created!.id })
+      .returning();
+    return c.json({ agent: toApi(created!, widgetChannel!.id) }, 201);
   });
 
   router.patch('/:id', async (c) => {
@@ -62,7 +81,12 @@ export function agentsRoute({ db }: Deps) {
       .where(and(eq(agent.id, id), eq(agent.orgId, orgId)))
       .returning();
     if (!updated) return c.json({ error: 'not_found' }, 404);
-    return c.json({ agent: toApi(updated) }, 200);
+    const [widgetChannel] = await db
+      .select({ id: channel.id })
+      .from(channel)
+      .where(and(eq(channel.agentId, updated.id), eq(channel.kind, 'widget')))
+      .limit(1);
+    return c.json({ agent: toApi(updated, widgetChannel?.id ?? null) }, 200);
   });
 
   router.delete('/:id', async (c) => {
@@ -80,7 +104,7 @@ export function agentsRoute({ db }: Deps) {
   return router;
 }
 
-function toApi(row: AgentRow) {
+function toApi(row: AgentRow, widgetChannelId: string | null) {
   return {
     id: row.id,
     name: row.name,
@@ -88,26 +112,8 @@ function toApi(row: AgentRow) {
     model: row.model,
     runtimeMode: row.runtimeMode,
     voiceEnabled: row.voiceEnabled,
+    widgetChannelId,
   };
-}
-
-async function resolveOrgId(c: Context, db: PostgresJsDatabase): Promise<string | null> {
-  const token = getCookie(c, SESSION_COOKIE);
-  if (!token) return null;
-  const [row] = await db
-    .select({ orgId: user.orgId, expiresAt: session.expiresAt })
-    .from(session)
-    .innerJoin(user, eq(session.userId, user.id))
-    .where(eq(session.tokenHash, hashToken(token)))
-    .limit(1);
-  if (!row || row.expiresAt.getTime() < Date.now()) return null;
-  return row.orgId;
-}
-
-function hashToken(token: string): string {
-  const hasher = new Bun.CryptoHasher('sha256');
-  hasher.update(token);
-  return hasher.digest('hex');
 }
 
 async function safeJson(req: Request): Promise<unknown> {
