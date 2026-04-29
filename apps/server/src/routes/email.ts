@@ -63,7 +63,7 @@ export function emailRoute({ db, credentials }: Deps) {
         orgId,
         kind: 'email',
         agentId: input.agentId,
-        emailAddress: input.emailAddress,
+        address: input.emailAddress,
         mailtrapInboxId: input.mailtrapInboxId,
       })
       .returning();
@@ -73,7 +73,7 @@ export function emailRoute({ db, credentials }: Deps) {
           id: created!.id,
           kind: created!.kind,
           agentId: created!.agentId,
-          emailAddress: created!.emailAddress,
+          emailAddress: created!.address,
           mailtrapInboxId: created!.mailtrapInboxId,
         },
       },

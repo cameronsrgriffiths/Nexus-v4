@@ -82,7 +82,7 @@ test('POST /api/email/channels: creates channel and stores all four mailtrap cre
   const channels = await db.select().from(channel);
   expect(channels.length).toBe(1);
   expect(channels[0]!.kind).toBe('email');
-  expect(channels[0]!.emailAddress).toBe('agent@nexus.test');
+  expect(channels[0]!.address).toBe('agent@nexus.test');
   expect(channels[0]!.mailtrapInboxId).toBe('inbox-1');
 
   const credentials = createCredentialService({

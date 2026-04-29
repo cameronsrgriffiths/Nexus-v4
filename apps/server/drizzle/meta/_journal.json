@@ -57,6 +57,13 @@
       "when": 1777800000000,
       "tag": "0007_channel_address",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778000000000,
+      "tag": "0008_drop_email_address",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,14 @@ test('unauthenticated requests are rejected with 401', async () => {
   expect(res.status).toBe(401);
 });
 
+test('GET /api/agents returns 200 with empty list for a fresh org', async () => {
+  const cookie = await registerAndCookie('fresh@example.com');
+  const res = await app.request('/api/agents', { headers: { cookie } });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { agents: unknown[] };
+  expect(body.agents).toEqual([]);
+});
+
 test('create agent → list returns it scoped to operator org', async () => {
   const cookie = await registerAndCookie('op@example.com');
 
@@ -71,12 +79,14 @@ test('create agent → list returns it scoped to operator org', async () => {
       model: string;
       runtimeMode: string;
       voiceEnabled: boolean;
+      widgetChannelId: string | null;
     };
   };
   expect(created.agent.name).toBe('Sales Bot');
   expect(created.agent.runtimeMode).toBe('headless');
   expect(created.agent.voiceEnabled).toBe(false);
   expect(created.agent.id).toMatch(/^[0-9a-f-]{36}$/);
+  expect(created.agent.widgetChannelId).toMatch(/^[0-9a-f-]{36}$/);
 
   const list = await app.request('/api/agents', { headers: { cookie } });
   expect(list.status).toBe(200);

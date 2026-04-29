@@ -32,12 +32,12 @@ export function createEmailChannel({ db, client, runtime }: EmailChannelDeps) {
       .from(channelTable)
       .where(eq(channelTable.id, channelId))
       .limit(1);
-    if (!ch || ch.kind !== 'email' || !ch.mailtrapInboxId || !ch.emailAddress) return;
+    if (!ch || ch.kind !== 'email' || !ch.mailtrapInboxId || !ch.address) return;
 
     const messages = await client.listMessages(ch.mailtrapInboxId);
     for (const msg of messages) {
       // Skip our own outbound: the inbox holds both directions in the sandbox.
-      if (msg.from === ch.emailAddress) continue;
+      if (msg.from === ch.address) continue;
 
       const inserted = await db
         .insert(channelInboundSeen)
@@ -67,10 +67,10 @@ export function createEmailChannel({ db, client, runtime }: EmailChannelDeps) {
       const reply = await runtime.invokeOverHistory(resolved);
 
       // Outbound: same `to` as the inbound's `from`, threaded via headers.
-      const outboundMessageId = generateMessageId(ch.emailAddress);
+      const outboundMessageId = generateMessageId(ch.address);
       const references = [...(msg.references ?? []), msg.messageId];
       await client.sendMail({
-        from: ch.emailAddress,
+        from: ch.address,
         to: msg.from,
         subject: replySubject(msg.subject),
         text: reply,
@@ -101,7 +101,7 @@ export function createEmailChannel({ db, client, runtime }: EmailChannelDeps) {
       .from(channelTable)
       .where(eq(channelTable.id, args.channelId))
       .limit(1);
-    if (!ch || ch.kind !== 'email' || !ch.emailAddress) {
+    if (!ch || ch.kind !== 'email' || !ch.address) {
       throw new Error(`channel not an email channel: ${args.channelId}`);
     }
 
@@ -112,9 +112,9 @@ export function createEmailChannel({ db, client, runtime }: EmailChannelDeps) {
       content: args.content,
     });
 
-    const messageId = generateMessageId(ch.emailAddress);
+    const messageId = generateMessageId(ch.address);
     await client.sendMail({
-      from: ch.emailAddress,
+      from: ch.address,
       to: args.toEmail,
       subject: args.subject ?? 'Hello',
       text: args.content,
