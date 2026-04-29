@@ -19,6 +19,7 @@ import { emailRoute } from './routes/email.ts';
 import { createWorkerPool } from './headless/worker-pool.ts';
 import { createHeadlessRuntime } from './headless/runtime.ts';
 import { smsRoute } from './sms/route.ts';
+import { telegramRoute } from './telegram/route.ts';
 
 const env = loadEnv();
 
@@ -66,6 +67,7 @@ app.route('/api/channels', channelsRoute({ db, credentials }));
 app.route('/api/email', emailRoute({ db, credentials }));
 app.route('/widget', widgetRoute({ db, sessionRoot, invokeAgent }));
 app.route('/sms', smsRoute({ db, credentials, runtime }));
+app.route('/telegram', telegramRoute({ db, credentials, runtime }));
 mountStatic(app);
 
 const server = Bun.serve({
