@@ -11,6 +11,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@nexus/logger": "workspace:*",
     "hono": "^4.6.12",
     "drizzle-orm": "^0.36.4",
     "postgres": "^3.4.5",
