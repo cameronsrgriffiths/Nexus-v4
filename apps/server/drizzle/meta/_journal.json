@@ -64,6 +64,13 @@
       "when": 1778000000000,
       "tag": "0008_drop_email_address",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778100000000,
+      "tag": "0009_knowledge_write_log",
+      "breakpoints": true
     }
   ]
 }

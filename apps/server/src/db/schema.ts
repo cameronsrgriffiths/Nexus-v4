@@ -13,6 +13,19 @@ import {
 
 export const runtimeMode = pgEnum('runtime_mode', ['headless', 'dedicated']);
 export const knowledgeScope = pgEnum('knowledge_scope', ['org', 'agent', 'contact']);
+// Mode each knowledge write used. Mirrors the service's WriteParams modes;
+// kept as an enum so the write log can be queried for auto-merge eligibility
+// (append-vs-append) without parsing free-form text.
+export const knowledgeWriteMode = pgEnum('knowledge_write_mode', [
+  'create',
+  'append',
+  'overwrite',
+  'force',
+]);
+// Who issued a knowledge write. The conflict UI's audit trail needs to know
+// which versions came from the agent vs. an operator so a "lost agent write"
+// is identifiable after a force-overwrite.
+export const knowledgeWriteActor = pgEnum('knowledge_write_actor', ['agent', 'operator']);
 
 const tsvector = customType<{ data: string; default: false }>({
   dataType() {
@@ -145,6 +158,39 @@ export const knowledgePage = pgTable(
       t.title,
     ),
     scopeIdx: index('knowledge_page_scope_idx').on(t.orgId, t.scope, t.scopeId),
+  }),
+);
+
+// Append-only log of every successful knowledge_page write. Two roles:
+//   1. Auto-merge eligibility — the operator UI auto-merges append-vs-append
+//      conflicts; to know a stretch of intervening writes is all `append`,
+//      we look them up here by (page_id, version_after).
+//   2. Audit trail for "lost" agent writes — when the operator force-saves
+//      after an agent overwrite, the agent's write row stays in this log
+//      forever; that row IS the audit record.
+export const knowledgeWriteLog = pgTable(
+  'knowledge_write_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => knowledgePage.id, { onDelete: 'cascade' }),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => org.id, { onDelete: 'cascade' }),
+    versionAfter: integer('version_after').notNull(),
+    mode: knowledgeWriteMode('mode').notNull(),
+    actor: knowledgeWriteActor('actor').notNull(),
+    contentAfter: text('content_after').notNull(),
+    // Marks rows recording an agent write that was overwritten by a force
+    // commit. Null on every other row. Set by the operator save handler when
+    // it commits a force; the row referenced is the latest log entry that
+    // existed before the force ran.
+    lostToForceById: uuid('lost_to_force_by_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pageVersionIdx: index('knowledge_write_log_page_version_idx').on(t.pageId, t.versionAfter),
   }),
 );
 
