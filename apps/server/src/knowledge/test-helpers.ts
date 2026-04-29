@@ -19,37 +19,6 @@ export function fakeEmbedder(): Embedder {
   };
 }
 
-// Run an in-process HTTP server that speaks the OpenAI-compatible /embeddings
-// shape. Lets us point the production HttpEmbedder at it via fetch — no mocks.
-export function startFakeEmbeddingServer(): { url: string; stop: () => Promise<void> } {
-  const server = Bun.serve({
-    port: 0,
-    fetch(req) {
-      const url = new URL(req.url);
-      if (url.pathname === '/embeddings' && req.method === 'POST') {
-        return req.json().then((body: any) => {
-          const input: string = body.input;
-          const embedding = embedTextToVector(input);
-          return new Response(
-            JSON.stringify({ data: [{ embedding }] }),
-            { headers: { 'content-type': 'application/json' } },
-          );
-        });
-      }
-      if (url.pathname === '/health') {
-        return new Response('ok');
-      }
-      return new Response('not found', { status: 404 });
-    },
-  });
-  return {
-    url: `http://localhost:${server.port}`,
-    stop: async () => {
-      server.stop(true);
-    },
-  };
-}
-
 function embedTextToVector(text: string): number[] {
   const tokens = tokenize(text);
   const vec = new Array<number>(DIM).fill(0);
