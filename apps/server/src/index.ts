@@ -20,6 +20,7 @@ import { knowledgeRoute } from './routes/knowledge.ts';
 import { createWorkerPool } from './headless/worker-pool.ts';
 import { createHeadlessRuntime } from './headless/runtime.ts';
 import { smsRoute } from './sms/route.ts';
+import { telegramRoute } from './telegram/route.ts';
 import { createKnowledgeService } from './knowledge/service.ts';
 import { createHttpEmbedder } from './embedding/client.ts';
 
@@ -79,6 +80,7 @@ app.route(
 );
 app.route('/widget', widgetRoute({ db, sessionRoot, invokeAgent }));
 app.route('/sms', smsRoute({ db, credentials, runtime }));
+app.route('/telegram', telegramRoute({ db, credentials, runtime }));
 mountStatic(app);
 
 const server = Bun.serve({

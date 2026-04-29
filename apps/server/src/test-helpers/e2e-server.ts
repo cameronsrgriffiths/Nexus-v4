@@ -24,6 +24,7 @@ import { mountStatic } from '../routes/static.ts';
 import { createCredentialService } from '../credentials/service.ts';
 import { createHeadlessRuntime } from '../headless/runtime.ts';
 import { smsRoute } from '../sms/route.ts';
+import { telegramRoute } from '../telegram/route.ts';
 import { createKnowledgeService } from '../knowledge/service.ts';
 import { fakeEmbedder } from '../knowledge/test-helpers.ts';
 import { agentWrite } from '../knowledge/operator.ts';
@@ -63,6 +64,13 @@ const runtime = createHeadlessRuntime({ db, sessionRoot, invokeAgent });
 const twilioFetch = async () =>
   new Response(JSON.stringify({ sid: 'SMe2e-stub' }), {
     status: 201,
+    headers: { 'content-type': 'application/json' },
+  });
+
+// Same reason as twilioFetch: don't hit api.telegram.org from CI.
+const telegramFetch = async () =>
+  new Response(JSON.stringify({ ok: true, result: { message_id: 1 } }), {
+    status: 200,
     headers: { 'content-type': 'application/json' },
   });
 
@@ -129,6 +137,7 @@ app.get('/api/_test/org-id', async (c) => {
 
 app.route('/widget', widgetRoute({ db, sessionRoot, invokeAgent }));
 app.route('/sms', smsRoute({ db, credentials, runtime, twilioFetch }));
+app.route('/telegram', telegramRoute({ db, credentials, runtime, telegramFetch }));
 mountStatic(app);
 
 const server = Bun.serve({ port, fetch: app.fetch });

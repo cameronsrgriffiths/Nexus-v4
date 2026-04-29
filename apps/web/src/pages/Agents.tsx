@@ -10,6 +10,7 @@ export type Agent = {
   voiceEnabled: boolean;
   widgetChannelId: string | null;
   smsChannel: { id: string; phoneNumber: string } | null;
+  telegramChannel: { id: string; botId: string } | null;
 };
 
 type FormDraft = {
@@ -39,6 +40,12 @@ const EMPTY_SMS_DRAFT: SmsDraft = {
   twilioAuthToken: '',
   phoneNumber: '',
 };
+
+type TelegramDraft = {
+  botToken: string;
+};
+
+const EMPTY_TELEGRAM_DRAFT: TelegramDraft = { botToken: '' };
 
 export function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -230,6 +237,9 @@ export function Agents() {
           void refresh();
         }}
         onConnectEmail={(a) => setConnectEmailFor(a)}
+        onTelegramConnected={() => {
+          void refresh();
+        }}
       />
 
       {connectEmailFor && (
@@ -286,6 +296,7 @@ function AgentList({
   onDelete,
   onSmsConnected,
   onConnectEmail,
+  onTelegramConnected,
 }: {
   loading: boolean;
   agents: Agent[];
@@ -293,8 +304,10 @@ function AgentList({
   onDelete: (a: Agent) => void;
   onSmsConnected: () => void;
   onConnectEmail: (a: Agent) => void;
+  onTelegramConnected: () => void;
 }) {
   const [openSmsAgentId, setOpenSmsAgentId] = useState<string | null>(null);
+  const [openTelegramAgentId, setOpenTelegramAgentId] = useState<string | null>(null);
   if (loading) {
     return <p className="text-zinc-400 text-sm">Loading…</p>;
   }
@@ -335,6 +348,14 @@ function AgentList({
                   SMS: <span className="font-mono">{a.smsChannel.phoneNumber}</span>
                 </div>
               )}
+              {a.telegramChannel && (
+                <div
+                  data-testid={`agent-telegram-channel-${a.id}`}
+                  className="mt-1 truncate text-xs text-zinc-300"
+                >
+                  Telegram bot: <span className="font-mono">{a.telegramChannel.botId}</span>
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               {!a.smsChannel && (
@@ -347,6 +368,18 @@ function AgentList({
                   className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
                 >
                   {openSmsAgentId === a.id ? 'Cancel' : 'Connect SMS'}
+                </button>
+              )}
+              {!a.telegramChannel && (
+                <button
+                  type="button"
+                  data-testid={`agent-connect-telegram-${a.id}`}
+                  onClick={() =>
+                    setOpenTelegramAgentId(openTelegramAgentId === a.id ? null : a.id)
+                  }
+                  className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                >
+                  {openTelegramAgentId === a.id ? 'Cancel' : 'Connect Telegram'}
                 </button>
               )}
               <button
@@ -382,6 +415,17 @@ function AgentList({
                 onSmsConnected();
               }}
               onCancel={() => setOpenSmsAgentId(null)}
+            />
+          )}
+
+          {openTelegramAgentId === a.id && (
+            <TelegramConnectForm
+              agentId={a.id}
+              onConnected={() => {
+                setOpenTelegramAgentId(null);
+                onTelegramConnected();
+              }}
+              onCancel={() => setOpenTelegramAgentId(null)}
             />
           )}
         </li>
@@ -481,6 +525,106 @@ function SmsConnectForm({
           className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:opacity-60"
         >
           {submitting ? 'Saving…' : 'Save SMS channel'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function TelegramConnectForm({
+  agentId,
+  onConnected,
+  onCancel,
+}: {
+  agentId: string;
+  onConnected: () => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState<TelegramDraft>(EMPTY_TELEGRAM_DRAFT);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/channels/telegram', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ agentId, ...draft }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Connect failed (${res.status})`);
+      }
+      setDraft(EMPTY_TELEGRAM_DRAFT);
+      onConnected();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Connect failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Pull the bot id (digits before the colon) so we can preview the inbound
+  // webhook URL the operator pastes back into Telegram via setWebhook. Falls
+  // back to a placeholder until the operator pastes a parseable token.
+  const botId = /^(\d+):/.exec(draft.botToken)?.[1] ?? '<bot_id>';
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  const webhookUrl = `${origin}/telegram/webhook/${botId}`;
+
+  return (
+    <form
+      data-testid={`telegram-connect-form-${agentId}`}
+      onSubmit={onSubmit}
+      className="space-y-3 rounded-md border border-zinc-800 bg-zinc-950/40 p-3 text-sm"
+    >
+      <h3 className="font-semibold text-zinc-200">Connect a Telegram bot</h3>
+      <p className="text-xs text-zinc-400">
+        In Telegram, open <span className="text-zinc-200">@BotFather</span>,
+        run <code className="rounded bg-zinc-800 px-1 font-mono">/newbot</code>{' '}
+        (or pick an existing one with{' '}
+        <code className="rounded bg-zinc-800 px-1 font-mono">/mybots</code>),
+        and paste the bot's HTTP API token below. Group chats are deferred to a
+        later release — this slice only handles 1-on-1 chats with the bot.
+      </p>
+      <TextField
+        label="Bot token (e.g. 1234567890:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)"
+        value={draft.botToken}
+        onChange={(botToken) => setDraft((d) => ({ ...d, botToken }))}
+        required
+      />
+      <div className="rounded-md border border-zinc-800 bg-zinc-900/60 p-2 text-xs text-zinc-400">
+        <p className="font-medium text-zinc-300">After saving:</p>
+        <p className="mt-1">
+          Tell Telegram where to deliver inbound messages by calling{' '}
+          <code className="rounded bg-zinc-800 px-1 font-mono">
+            https://api.telegram.org/bot&lt;token&gt;/setWebhook?url={webhookUrl}
+          </code>{' '}
+          once. We resolve the bot from the URL on every update.
+        </p>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:opacity-60"
+        >
+          {submitting ? 'Saving…' : 'Save Telegram channel'}
         </button>
         <button
           type="button"

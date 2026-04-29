@@ -159,3 +159,91 @@ test('POST /api/channels/sms: refuses to attach the same number twice', async ()
   });
   expect(second.status).toBe(409);
 });
+
+test('POST /api/channels/telegram: stores bot token + creates Telegram channel', async () => {
+  const { cookie } = await register();
+  const agentId = await createAgent(cookie);
+
+  const res = await app.request('/api/channels/telegram', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ agentId, botToken: '123456:ABCdefGHIjkl' }),
+  });
+  expect(res.status).toBe(201);
+  const body = (await res.json()) as {
+    channel: { id: string; kind: string; address: string; agentId: string };
+  };
+  expect(body.channel.kind).toBe('telegram');
+  // Bot id (the digits before the colon) is stored as the channel address so
+  // the public webhook can resolve the channel without trusting a path param.
+  expect(body.channel.address).toBe('123456');
+
+  // Bot token round-trips through the credential store.
+  const db = getDb(pg.url);
+  const credentials = createCredentialService({ db, encryptionKey: ENCRYPTION_KEY });
+  const channels = await db.execute<{ org_id: string }>(
+    sql`SELECT org_id FROM "channel" WHERE id = ${body.channel.id}`,
+  );
+  expect(await credentials.get(channels[0]!.org_id, 'telegram', 'bot_token')).toBe(
+    '123456:ABCdefGHIjkl',
+  );
+});
+
+test('POST /api/channels/telegram: 401 when not authenticated', async () => {
+  const res = await app.request('/api/channels/telegram', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      agentId: '00000000-0000-0000-0000-000000000000',
+      botToken: '1:t',
+    }),
+  });
+  expect(res.status).toBe(401);
+});
+
+test('POST /api/channels/telegram: 400 for malformed bot token', async () => {
+  const { cookie } = await register();
+  const agentId = await createAgent(cookie);
+
+  const res = await app.request('/api/channels/telegram', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ agentId, botToken: 'not-a-bot-token' }),
+  });
+  expect(res.status).toBe(400);
+});
+
+test('POST /api/channels/telegram: 404 when agent belongs to another org', async () => {
+  const { cookie: cookieA } = await register();
+  const db = getDb(pg.url);
+  const [orgB] = await db.execute<{ id: string }>(
+    sql`INSERT INTO org (name) VALUES ('B') RETURNING id`,
+  );
+  const [agB] = await db.execute<{ id: string }>(
+    sql`INSERT INTO agent (org_id, name, persona, model) VALUES (${orgB!.id}, 'b', 'p', 'm') RETURNING id`,
+  );
+
+  const res = await app.request('/api/channels/telegram', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie: cookieA },
+    body: JSON.stringify({ agentId: agB!.id, botToken: '777:zzz' }),
+  });
+  expect(res.status).toBe(404);
+});
+
+test('POST /api/channels/telegram: refuses to attach the same bot twice', async () => {
+  const { cookie } = await register();
+  const agentId = await createAgent(cookie);
+  const first = await app.request('/api/channels/telegram', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ agentId, botToken: '424242:firstcopy' }),
+  });
+  expect(first.status).toBe(201);
+  const second = await app.request('/api/channels/telegram', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ agentId, botToken: '424242:secondcopy' }),
+  });
+  expect(second.status).toBe(409);
+});
