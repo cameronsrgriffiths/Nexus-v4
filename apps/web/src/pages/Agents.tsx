@@ -7,6 +7,7 @@ export type Agent = {
   model: string;
   runtimeMode: 'headless' | 'dedicated';
   voiceEnabled: boolean;
+  widgetChannelId: string | null;
 };
 
 type FormDraft = {
@@ -282,6 +283,14 @@ function AgentList({
             <div className="truncate text-xs text-zinc-400">
               {a.model} · voice {a.voiceEnabled ? 'on' : 'off'}
             </div>
+            {a.widgetChannelId && (
+              <div
+                data-testid={`agent-widget-channel-${a.id}`}
+                className="mt-1 truncate font-mono text-[10px] text-zinc-500"
+              >
+                widget: {a.widgetChannelId}
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <button
