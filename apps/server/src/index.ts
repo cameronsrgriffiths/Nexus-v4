@@ -14,6 +14,7 @@ import { authRoute } from './routes/auth.ts';
 import { agentsRoute } from './routes/agents.ts';
 import { widgetRoute } from './routes/widget.ts';
 import { conversationsRoute } from './routes/conversations.ts';
+import { analyticsRoute } from './routes/analytics.ts';
 import { channelsRoute } from './routes/channels.ts';
 import { emailRoute } from './routes/email.ts';
 import { knowledgeRoute } from './routes/knowledge.ts';
@@ -66,6 +67,7 @@ app.route('/healthz', healthRoute({ env, db }));
 app.route('/api/auth', authRoute({ db }));
 app.route('/api/agents', agentsRoute({ db }));
 app.route('/api/conversations', conversationsRoute({ db }));
+app.route('/api/analytics', analyticsRoute({ db }));
 app.route('/api/channels', channelsRoute({ db, credentials }));
 app.route('/api/email', emailRoute({ db, credentials }));
 app.route(
