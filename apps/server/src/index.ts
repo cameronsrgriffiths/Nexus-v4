@@ -17,9 +17,13 @@ import { conversationsRoute } from './routes/conversations.ts';
 import { analyticsRoute } from './routes/analytics.ts';
 import { channelsRoute } from './routes/channels.ts';
 import { emailRoute } from './routes/email.ts';
+import { knowledgeRoute } from './routes/knowledge.ts';
 import { createWorkerPool } from './headless/worker-pool.ts';
 import { createHeadlessRuntime } from './headless/runtime.ts';
 import { smsRoute } from './sms/route.ts';
+import { telegramRoute } from './telegram/route.ts';
+import { createKnowledgeService } from './knowledge/service.ts';
+import { createHttpEmbedder } from './embedding/client.ts';
 
 const env = loadEnv();
 
@@ -66,8 +70,19 @@ app.route('/api/conversations', conversationsRoute({ db }));
 app.route('/api/analytics', analyticsRoute({ db }));
 app.route('/api/channels', channelsRoute({ db, credentials }));
 app.route('/api/email', emailRoute({ db, credentials }));
+app.route(
+  '/api/knowledge',
+  knowledgeRoute({
+    db,
+    service: createKnowledgeService({
+      db,
+      embedder: createHttpEmbedder({ baseUrl: env.EMBEDDING_URL }),
+    }),
+  }),
+);
 app.route('/widget', widgetRoute({ db, sessionRoot, invokeAgent }));
 app.route('/sms', smsRoute({ db, credentials, runtime }));
+app.route('/telegram', telegramRoute({ db, credentials, runtime }));
 mountStatic(app);
 
 const server = Bun.serve({

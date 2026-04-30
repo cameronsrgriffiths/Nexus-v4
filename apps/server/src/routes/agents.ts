@@ -102,6 +102,8 @@ function toApi(row: AgentRow, channels: ChannelRow[]) {
   // without filtering on its end.
   const widget = channels.find((c) => c.kind === 'widget' && c.agentId === row.id) ?? null;
   const sms = channels.find((c) => c.kind === 'sms' && c.agentId === row.id) ?? null;
+  const telegram =
+    channels.find((c) => c.kind === 'telegram' && c.agentId === row.id) ?? null;
   return {
     id: row.id,
     name: row.name,
@@ -111,6 +113,7 @@ function toApi(row: AgentRow, channels: ChannelRow[]) {
     voiceEnabled: row.voiceEnabled,
     widgetChannelId: widget?.id ?? null,
     smsChannel: sms ? { id: sms.id, phoneNumber: sms.address ?? '' } : null,
+    telegramChannel: telegram ? { id: telegram.id, botId: telegram.address ?? '' } : null,
   };
 }
 

@@ -5,6 +5,7 @@ import { Agents } from './pages/Agents';
 import { Analytics } from './pages/Analytics';
 import { Conversations } from './pages/Conversations';
 import { Dashboard } from './pages/Dashboard';
+import { Knowledge } from './pages/Knowledge';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 
@@ -20,6 +21,7 @@ export function App() {
               <Route index element={<Dashboard />} />
               <Route path="/agents" element={<Agents />} />
               <Route path="/conversations" element={<Conversations />} />
+              <Route path="/knowledge" element={<Knowledge />} />
               <Route path="/analytics" element={<Analytics />} />
             </Route>
           </Route>
